@@ -1,1 +1,1 @@
-# simonmig10-Version-2024-August-E-SFC-IO-DK
+# Empirical Ecological Stock-Flow-Consistent Input-Output model for the Danish economy
