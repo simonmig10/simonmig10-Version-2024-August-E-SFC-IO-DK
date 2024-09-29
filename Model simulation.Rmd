@@ -106,9 +106,6 @@ S_modelData=c(Model_data_1995, Model_data_1996,Model_data_collected_IO,Trade_var
 
 ```{r}
 
-
-
-
 ######## Shock 1 to interest rate
 
 S_modelData$Scenario_1= TIMESERIES(rep(0,28), START = c(1995,1), FREQ = 1)
