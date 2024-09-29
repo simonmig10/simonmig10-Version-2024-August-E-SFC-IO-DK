@@ -1,0 +1,2058 @@
+---
+title: "Exo model 7 industries DEFLATED IO"
+author: "Simon"
+date: "2023-09-26"
+output: html_document
+---
+# Start 
+
+```{r}
+rm(list = ls())
+```
+
+
+# Set theme for plots
+
+```{r}
+# Set a theme
+theme_journal <- function() {
+  par(
+    bg = "white",            # Background color
+    col.lab = "black",       # Axis labels color
+    col.main = "black",      # Main title color
+    col.axis = "black",      # Axis text color
+    font.main = 2,           # Main title font (2 = bold)
+    font.lab = 1,            # Axis labels font
+    font.axis = 1,           # Axis text font (1 = plain)
+    mar = c(5, 5, 4, 2) + 0.1, # Margins (bottom, left, top, right)
+    tck = -0.015,            # Tick mark length
+    las = 1,                 # Axis labels orientation (1 = horizontal)
+    mgp = c(3, 1, 0),        # Axis title and labels distance
+    cex.main = 1.2,          # Main title size
+    cex.lab = 1.1,           # Axis labels size
+    cex.axis = 1,            # Axis text size
+    lwd = 2                  # Line width
+  )
+}
+
+
+```
+
+
+# Packages
+
+```{r}
+library(bimets)
+library(tidyverse)
+library(tstools)
+```
+
+
+# Load in txt file
+
+```{r}
+library(readr)
+
+Endo_model <- 'model endo 21-09 (food)'
+Exo_model <- 'model exo 21-09 (food)'
+
+
+S_model.txt=readChar(Endo_model, file.info(Endo_model)$size)
+
+#S_model.txt=readChar(Exo_model, file.info(Exo_model)$size)
+
+```
+
+# Check text!
+
+```{r}
+S_model=LOAD_MODEL(modelText = S_model.txt)
+```
+
+
+# Data
+
+We create a list to store the variables within
+
+```{r}
+
+library(readxl)
+Model_data_1995 <- read_excel("Model_data_1995.xlsx")
+Model_data_1996 <- read_excel("Model_data_1996.xlsx")
+Trade_variables <- read_excel("Trade variables.xlsx")
+Model_data_collected_IO <- read_excel("Model_data_collected_IO_117.xlsx")
+Emission_coeff_data <- read_excel("Emission_coeff_data.xlsx")
+Model_data_RER_1995 <- read_excel("Model_data_RER_1995.xlsx")
+Model_data_RER_1996 <- read_excel("Model_data_RER_1996.xlsx")
+Model_baci_data <- read_excel("Model_baci_data.xlsx")
+Model_data_leak <- read_excel("Model_data_leak.xlsx")
+Model_data_cons <- read_excel("Model_data_cons.xlsx")
+Model_data_industry_sector_shares <- read_excel("Model_data_industry_sector_shares.xlsx")
+
+
+Model_data_1995=lapply(Model_data_1995, function(t) TIMESERIES(t, START=c(1995, 1),FREQ =1))
+Model_data_1996=lapply(Model_data_1996, function(t) TIMESERIES(t, START=c(1996, 1),FREQ =1))
+Trade_variables=lapply(Trade_variables, function(t) TIMESERIES(t, START=c(1995, 1),FREQ =1))
+Model_data_collected_IO=lapply(Model_data_collected_IO, function(t) TIMESERIES(t, START=c(1995, 1),FREQ =1))
+Emission_coeff_data=lapply(Emission_coeff_data, function(t) TIMESERIES(t, START=c(1995, 1),FREQ =1))
+Model_data_RER_1995=lapply(Model_data_RER_1995, function(t) TIMESERIES(t, START=c(1995, 1),FREQ =1))
+Model_data_RER_1996=lapply(Model_data_RER_1996, function(t) TIMESERIES(t, START=c(1996, 1),FREQ =1))
+Model_baci_data=lapply(Model_baci_data, function(t) TIMESERIES(t, START=c(1995, 1),FREQ =1))
+Model_data_leak=lapply(Model_data_leak, function(t) TIMESERIES(t, START=c(1995, 1),FREQ =1))
+Model_data_cons=lapply(Model_data_cons, function(t) TIMESERIES(t, START=c(1995, 1),FREQ =1))
+Model_data_industry_sector_shares=lapply(Model_data_industry_sector_shares, function(t) TIMESERIES(t, START=c(1995, 1),FREQ =1))
+
+
+S_modelData=c(Model_data_1995, Model_data_1996,Model_data_collected_IO,Trade_variables,Emission_coeff_data,Model_data_RER_1995,Model_data_RER_1996,Model_baci_data,Model_data_leak,Model_data_cons,Model_data_industry_sector_shares)
+
+```
+
+
+## Shock variables:
+
+```{r}
+######### Shock 1 to government spendings
+S_modelData$Scenario_1= TIMESERIES(rep(0,28), START = c(1995,1), FREQ = 1)
+S_modelData$govk_tot_shock = S_modelData$govk_tot*1.05
+
+
+######### Shock 2 Implementing carbon tax.
+S_modelData$Scenario_2= TIMESERIES(rep(0,28), START = c(1995,1), FREQ = 1)
+S_modelData$Co2E_tax_1_shock = TIMESERIES(rep(0.00000000035,28), START = c(1995,1), FREQ = 1)
+
+
+######## Shock 3 to interest rate
+
+S_modelData$Scenario_3= TIMESERIES(rep(0,28), START = c(1995,1), FREQ = 1)
+S_modelData$iloan_shock = S_modelData$iloan+0.02
+S_modelData$ibd_shock = S_modelData$ibd+0.02
+S_modelData$idep_shock = S_modelData$idep+0.02
+
+
+```
+
+## Variables needed for behavioural eq.
+
+```{r}
+S_modelData$eq_h_ratio= (S_modelData$neq_h - S_modelData$neq_h_rv)/(TSLAG(S_modelData$neq_h,1) +TSLAG(S_modelData$nsec_h,1) +TSLAG(S_modelData$ndepo_h,1) +  TSLAG(S_modelData$nloa_h,1) +  TSLAG(S_modelData$ninsu_h,1)+ TSLAG(S_modelData$ndir_h,1)+ TSLAG(S_modelData$ncred_h,1))
+
+
+S_modelData$loa_h_ratio= -S_modelData$nloa_h/S_modelData$yd_h
+S_modelData$nloa_ratio_nfc=-S_modelData$nloa_nfc/S_modelData$K_nfc
+```
+
+```{r}
+
+S_modelData$d_2016=create_dummy_ts(start_basic = c(1995), end_basic=c(2020),
+ dummy_start=c(2016), dummy_end = c(2016),
+ basic_value = 0, dummy_value = 1, frequency = 1)
+
+
+S_modelData$time= TIMESERIES(1:length(S_modelData$d_2016), START = c(1995,1), FREQ = 1)
+
+```
+
+
+
+```{r}
+S_modelData$y_h = S_modelData$w_h_r + S_modelData$b2_h_r + S_modelData$nint_h + S_modelData$ndiv_h + S_modelData$re_fdi_r_h + S_modelData$noir_h - S_modelData$scon_p_h + S_modelData$sben_r_h + S_modelData$oct_h
+
+S_modelData$y_nfc = S_modelData$y + S_modelData$b2_nfc_r - S_modelData$b2_tot - (S_modelData$n_prod_tax_tot + S_modelData$opt_tot) - S_modelData$w_nfc + S_modelData$nint_nfc + S_modelData$ndiv_nfc + S_modelData$noir_nfc + (S_modelData$re_fdi_r_nfc - S_modelData$re_fdi_p_nfc)  + S_modelData$oct_nfc
+ 
+S_modelData$y_fc = S_modelData$b2_fc_r + S_modelData$nint_fc + S_modelData$ndiv_fc + S_modelData$noir_fc + (S_modelData$re_fdi_r_fc - S_modelData$re_fdi_p_fc)  + S_modelData$scon_r_fc - S_modelData$sben_p_fc + S_modelData$oct_fc
+```
+
+
+## Aggregate price indexes
+
+As we use price indexes based on the input output tables, making the assumption of one price for industry 1-9 and so on, we do not match the aggregate price indexes based on aggregate variables.
+
+We can update the current price indexes with the new ones calculated based on IO data. 
+
+```{r}
+S_modelData$ppcon=S_modelData$ppcon_io
+S_modelData$pin=S_modelData$pin_io
+S_modelData$pinvent=S_modelData$pinvent_io
+S_modelData$px=S_modelData$px_io
+S_modelData$pg=S_modelData$pg_io
+S_modelData$pim=S_modelData$pim_io
+```
+
+
+We need to calculate new deflated variables:
+
+```{r}
+
+S_modelData$pconk_io=S_modelData$pcon/S_modelData$ppcon
+S_modelData$ik_io=S_modelData$i/S_modelData$pin
+S_modelData$inventk_io=S_modelData$invent/S_modelData$pinvent
+S_modelData$xk_io=S_modelData$x/S_modelData$px
+S_modelData$gk_io=S_modelData$g/S_modelData$pg
+S_modelData$imk_io=S_modelData$im /S_modelData$pim
+
+
+S_modelData$yk_io= S_modelData$pconk_io + S_modelData$ik_io + S_modelData$inventk_io + S_modelData$xk_io + S_modelData$gk_io - S_modelData$imk_io
+S_modelData$nxk  = S_modelData$xk - S_modelData$imk
+```
+
+
+We now show the differences:
+```{r, fig.width=10, fig.height=7}
+
+par(mfrow=c(2,3))
+
+
+plot(window(S_modelData$pconk,end= c(2019,1)), col= "black", lty=1, lwd=2,ylab="Mio dkk", main= "Consumption", ylim= c(650,1200));
+lines(S_modelData$pconk_io, col="blue", lwd=2, lty=1);
+legend("topleft",legend=c("Value in 2010 prices DK-statistics", "Value in 2010 prices IO data"),lty=c(1),lwd=c(2),bty="n", col = c("black","blue" ));grid()
+
+plot(window(S_modelData$ik,end= c(2019,1)), col= "black", lty=1, lwd=2,ylab="Mio dkk", main= "Investments", ylim= c(200,600));
+lines(S_modelData$ik_io, col="blue", lwd=2, lty=1);
+legend("topleft",legend=c("Value in 2010 prices DK-statistics", "Value in 2010 prices IO data"),lty=c(1),lwd=c(2),bty="n", col = c("black","blue" ));grid()
+
+plot(window(S_modelData$imk,end= c(2019,1)), col= "black", lty=1, lwd=2,ylab="Mio dkk", main= "Imports", ylim= c(350,1400));
+lines(S_modelData$imk_io, col="blue", lwd=2, lty=1);
+legend("topleft",legend=c("Value in 2010 prices DK-statistics", "Value in 2010 prices IO data"),lty=c(1),lwd=c(2),bty="n", col = c("black","blue" ));grid()
+
+plot(window(S_modelData$xk,end= c(2019,1)), col= "black", lty=1, lwd=2,ylab="Mio dkk", main= "Exports", ylim= c(450,1500));
+lines(S_modelData$xk_io, col="blue", lwd=2, lty=1);
+legend("topleft",legend=c("Value in 2010 prices DK-statistics", "Value in 2010 prices IO data"),lty=c(1),lwd=c(2),bty="n", col = c("black","blue" ));grid()
+
+
+plot(window(S_modelData$gk,end= c(2019,1)), col= "black", lty=1, lwd=2,ylab="Mio dkk", main= "Government spending", ylim= c(350,600));
+lines(S_modelData$gk_io, col="blue", lwd=2, lty=1);
+legend("topleft",legend=c("Value in 2010 prices DK-statistics", "Value in 2010 prices IO data"),lty=c(1),lwd=c(2),bty="n", col = c("black","blue" ));grid()
+
+
+plot(window(S_modelData$yk,end= c(2019,1)), col= "black", lty=1, lwd=2,ylab="Mio dkk", main= "GDP", ylim= c(1400,2500));
+lines(S_modelData$yk_io, col="blue", lwd=2, lty=1);
+legend("topleft",legend=c("Value in 2010 prices DK-statistics", "Value in 2010 prices IO data"),lty=c(1),lwd=c(2),bty="n", col = c("black","blue" ));grid()
+
+```
+
+As the differences seem to not be to large, we update the real variables to use the new price indexes.
+
+
+```{r}
+
+S_modelData$pconk=S_modelData$pcon/S_modelData$ppcon
+S_modelData$ik=S_modelData$i/S_modelData$pin
+S_modelData$inventk=S_modelData$invent/S_modelData$pinvent
+S_modelData$xk=S_modelData$x/S_modelData$px
+S_modelData$gk=S_modelData$g/S_modelData$pg
+S_modelData$imk=S_modelData$im /S_modelData$pim
+
+S_modelData$yk= S_modelData$pconk + S_modelData$ik + S_modelData$inventk + S_modelData$xk + S_modelData$gk - S_modelData$imk
+
+```
+
+
+## Consumption tax
+
+```{r}
+S_modelData$c_oth_envT=TIMESERIES(rep(0,25), START = c(1995,1), FREQ = 1)
+S_modelData$c_110_envT=TIMESERIES(rep(0,25), START = c(1995,1), FREQ = 1)
+S_modelData$c_120_envT=TIMESERIES(rep(0,25), START = c(1995,1), FREQ = 1)
+S_modelData$c_130_envT=TIMESERIES(rep(0,25), START = c(1995,1), FREQ = 1)
+S_modelData$c_140_envT=TIMESERIES(rep(0,25), START = c(1995,1), FREQ = 1)
+S_modelData$c_160_envT=TIMESERIES(rep(0,25), START = c(1995,1), FREQ = 1)
+S_modelData$c_180_envT=TIMESERIES(rep(0,25), START = c(1995,1), FREQ = 1)
+
+
+
+S_modelData$c_envT= S_modelData$c_oth_envT + S_modelData$c_110_envT + S_modelData$c_120_envT + S_modelData$c_130_envT + S_modelData$c_140_envT + S_modelData$c_160_envT + S_modelData$c_180_envT
+
+S_modelData$envT_tot =  S_modelData$c_envT
+
+```
+
+
+We also create new deflated yd and fnw variables, where tax changes are included:
+
+```{r}
+S_modelData$yd_hk_tax=S_modelData$yd_h/S_modelData$ppcon_tax
+S_modelData$fnw_hk_tax = S_modelData$fnw_h/S_modelData$ppcon_tax
+```
+
+
+
+# Combine model with data!
+
+```{r}
+S_model=LOAD_MODEL_DATA(S_model,S_modelData)
+
+```
+
+
+# Estimate
+
+```{r}
+
+#Estimate model coefficients
+S_model=ESTIMATE(S_model
+                 ,TSRANGE=c(1996,1,2019,1)
+)
+```
+
+
+# Baseline
+
+
+```{r, results='hide'}
+# Simulate the model (following shock)
+Exo_model <- SIMULATE(S_model
+                    ,simType='dynamic'
+                    ,TSRANGE=c(1998,1,2019,1)
+                    ,simConvergence=0.00001
+                    ,simIterLimit=100
+                    )
+```
+
+
+
+```{r}
+
+Exo_model$simulation$check_nl
+Exo_model$simulation$check_sec
+Exo_model$simulation$check_np
+Exo_model$simulation$check_ctr
+Exo_model$simulation$check_invest
+Exo_model$simulation$check_tax
+
+Exo_model$simulation$nxk
+
+
+Exo_model$simulation$s_ck_oth - S_modelData$s_ck_oth
+Exo_model$simulation$s_ck_110 - S_modelData$s_ck_110
+Exo_model$simulation$s_ck_120 - S_modelData$s_ck_120
+Exo_model$simulation$s_ck_130 - S_modelData$s_ck_130
+Exo_model$simulation$s_ck_140 - S_modelData$s_ck_140
+Exo_model$simulation$s_ck_160 - S_modelData$s_ck_160
+Exo_model$simulation$s_ck_180 - S_modelData$s_ck_180
+
+Exo_model$simulation$s_ck_oth + Exo_model$simulation$s_ck_110 + Exo_model$simulation$s_ck_120 + Exo_model$simulation$s_ck_130 + Exo_model$simulation$s_ck_140 + Exo_model$simulation$s_ck_160 + Exo_model$simulation$s_ck_180
+
+
+
+Exo_model$simulation$yd_hk_tax - S_modelData$yd_hk_tax
+Exo_model$simulation$fnw_hk_tax - S_modelData$fnw_hk_tax
+
+Exo_model$simulation$pout_1 - S_modelData$pout_1
+Exo_model$simulation$pout_2 - S_modelData$pout_2
+Exo_model$simulation$pout_3 - S_modelData$pout_3
+Exo_model$simulation$pout_4 - S_modelData$pout_4
+Exo_model$simulation$pout_5 - S_modelData$pout_5
+Exo_model$simulation$pout_6 - S_modelData$pout_6
+Exo_model$simulation$pout_7 - S_modelData$pout_7
+Exo_model$simulation$pout_8 - S_modelData$pout_8
+
+
+Exo_model$simulation$ppcon_tax - S_modelData$ppcon_tax
+Exo_model$simulation$ppcon_ntax - S_modelData$ppcon_ntax
+
+Exo_model$simulation$phi_c_oth - S_modelData$phi_c_oth
+Exo_model$simulation$phi_c_110 - S_modelData$phi_c_110
+Exo_model$simulation$phi_c_120 - S_modelData$phi_c_120
+Exo_model$simulation$phi_c_130 - S_modelData$phi_c_130
+Exo_model$simulation$phi_c_140 - S_modelData$phi_c_140
+Exo_model$simulation$phi_c_160 - S_modelData$phi_c_160
+Exo_model$simulation$phi_c_180 - S_modelData$phi_c_180
+
+
+
+
+Exo_model$simulation$ppcon_ntax - Exo_model$simulation$ppcon # Very little difference, so maybe I should just ignore the taxes????
+
+
+Exo_model$simulation$Xk_dom_2 - S_modelData$Xk_dom_2
+Exo_model$simulation$Xk_dom_3 - S_modelData$Xk_dom_3
+Exo_model$simulation$Xk_dom_4 - S_modelData$Xk_dom_4
+
+
+Exo_model$simulation$b2_tot - S_modelData$b2_tot
+
+Exo_model$simulation$b2_nfc_r - S_modelData$b2_nfc_r
+Exo_model$simulation$b2_h_r - S_modelData$b2_h_r
+Exo_model$simulation$b2_fc_r - S_modelData$b2_fc_r
+Exo_model$simulation$b2_g_r - S_modelData$b2_g_r
+
+
+Exo_model$simulation$i - S_modelData$i
+
+Exo_model$simulation$i_nfc - S_modelData$i_nfc
+Exo_model$simulation$i_fc - S_modelData$i_fc
+Exo_model$simulation$i_g - S_modelData$i_g
+Exo_model$simulation$i_h - S_modelData$i_h
+
+
+Exo_model$simulation$ck_dom_5 - S_modelData$ck_dom_5
+Exo_model$simulation$zk_dom_52 - S_modelData$zk_dom_52
+Exo_model$simulation$zk_dom_53 - S_modelData$zk_dom_53
+Exo_model$simulation$zk_dom_54 - S_modelData$zk_dom_54
+Exo_model$simulation$zk_dom_55 - S_modelData$zk_dom_55
+Exo_model$simulation$zk_dom_56 - S_modelData$zk_dom_56
+Exo_model$simulation$zk_dom_57 - S_modelData$zk_dom_57
+Exo_model$simulation$zk_dom_58 - S_modelData$zk_dom_58
+Exo_model$simulation$zk_dom_59 - S_modelData$zk_dom_59
+
+Exo_model$simulation$z_im_d_1 - S_modelData$z_im_d_1
+Exo_model$simulation$z_im_d_2 - S_modelData$z_im_d_2
+Exo_model$simulation$z_im_d_3 - S_modelData$z_im_d_3
+Exo_model$simulation$z_im_d_4 - S_modelData$z_im_d_4
+Exo_model$simulation$z_im_d_5 - S_modelData$z_im_d_5
+Exo_model$simulation$z_im_d_6 - S_modelData$z_im_d_6
+Exo_model$simulation$z_im_d_7 - S_modelData$z_im_d_7
+Exo_model$simulation$z_im_d_8 - S_modelData$z_im_d_8
+Exo_model$simulation$z_im_d_9 - S_modelData$z_im_d_9
+
+Exo_model$simulation$c_im_d_tot - S_modelData$c_im_d_tot
+
+
+
+Exo_model$simulation$Xk_dom_6 - S_modelData$Xk_dom_6
+Exo_model$simulation$Xk_dom_7 - S_modelData$Xk_dom_7
+Exo_model$simulation$Xk_dom_8 - S_modelData$Xk_dom_8
+Exo_model$simulation$Xk_dom_9 - S_modelData$Xk_dom_9
+
+
+
+Exo_model$simulation$y - (Exo_model$simulation$b2_tot + Exo_model$simulation$w_nfc + Exo_model$simulation$opt_tot + Exo_model$simulation$n_prod_tax_tot)
+
+
+
+Exo_model$simulation$exk_1 - S_modelData$exk_1
+Exo_model$simulation$market_share_1 - S_modelData$market_share_1
+Exo_model$simulation$rer_1 - S_modelData$rer_1
+
+
+
+Exo_model$simulation$pim_oth - S_modelData$pim_oth
+Exo_model$simulation$ppcon_oth - S_modelData$ppcon_oth
+
+
+Exo_model$simulation$c_oth_im_1 - S_modelData$c_oth_im_1
+
+
+
+
+Exo_model$simulation$rer_oth - S_modelData$rer_oth
+Exo_model$simulation$phi_c_oth - S_modelData$phi_c_oth
+
+
+
+Exo_model$simulation$tot_env_tax_exc_rent_1 - S_modelData$tot_env_tax_exc_rent_1
+Exo_model$simulation$tot_env_tax_exc_rent_2 - S_modelData$tot_env_tax_exc_rent_2
+Exo_model$simulation$tot_env_tax_exc_rent_3 - S_modelData$tot_env_tax_exc_rent_3
+Exo_model$simulation$tot_env_tax_exc_rent_4 - S_modelData$tot_env_tax_exc_rent_4
+Exo_model$simulation$tot_env_tax_exc_rent_5 - S_modelData$tot_env_tax_exc_rent_5
+Exo_model$simulation$tot_env_tax_exc_rent_6 - S_modelData$tot_env_tax_exc_rent_6
+Exo_model$simulation$tot_env_tax_exc_rent_7 - S_modelData$tot_env_tax_exc_rent_7
+Exo_model$simulation$tot_env_tax_exc_rent_8 - S_modelData$tot_env_tax_exc_rent_8
+Exo_model$simulation$tot_env_tax_exc_rent_9 - S_modelData$tot_env_tax_exc_rent_9
+
+Exo_model$simulation$w_1 - S_modelData$w_1
+Exo_model$simulation$w_2 - S_modelData$w_2
+
+Exo_model$simulation$avg_w - S_modelData$avg_w_test
+
+
+Exo_model$simulation$exk_dom_1 - S_modelData$exk_dom_1
+Exo_model$simulation$exk_dom_3 - S_modelData$exk_dom_3
+Exo_model$simulation$exk_dom_4 - S_modelData$exk_dom_4
+Exo_model$simulation$exk_dom_5 - S_modelData$exk_dom_5
+Exo_model$simulation$exk_dom_6 - S_modelData$exk_dom_6
+Exo_model$simulation$exk_dom_7 - S_modelData$exk_dom_7
+
+
+Exo_model$simulation$CH4_tot - S_modelData$CH4_tot # I think the divergeses are very small, it seems like the code is correct.
+
+Exo_model$simulation$CH4_tot_1 - S_modelData$CH4_tot_1
+Exo_model$simulation$CH4_tot_2 - S_modelData$CH4_tot_2
+Exo_model$simulation$CH4_tot_3 - S_modelData$CH4_tot_3
+Exo_model$simulation$CH4_tot_4 - S_modelData$CH4_tot_4
+Exo_model$simulation$CH4_tot_5 - S_modelData$CH4_tot_5
+Exo_model$simulation$CH4_tot_5_energy - S_modelData$CH4_tot_5_energy
+S_modelData$NGasCons_5 - Exo_model$simulation$NGasCons_5 ### Most of the difference comes from this
+Exo_model$simulation$CH4_tot_6 - S_modelData$CH4_tot_6
+Exo_model$simulation$CH4_tot_7 - S_modelData$CH4_tot_7
+
+
+
+Exo_model$simulation$Co2_tot - S_modelData$Co2_tot
+
+Exo_model$simulation$Co2_tot_1 - S_modelData$Co2_tot_1
+Exo_model$simulation$Co2_tot_2 - S_modelData$Co2_tot_2
+Exo_model$simulation$Co2_tot_3 - S_modelData$Co2_tot_3
+Exo_model$simulation$Co2_tot_4 - S_modelData$Co2_tot_4
+Exo_model$simulation$Co2_tot_5 - S_modelData$Co2_tot_5 ##### Again most of the difference comes from 5th industry
+Exo_model$simulation$Co2_tot_6 - S_modelData$Co2_tot_6
+Exo_model$simulation$Co2_tot_7 - S_modelData$Co2_tot_7
+
+Exo_model$simulation$Co2E_1 - S_modelData$Co2E_1
+
+
+Exo_model$simulation$Co2E_u_1 - Exo_model$simulation$Co2_tot_1
+
+Exo_model$simulation$N2O_tot - S_modelData$N2O_tot
+
+Exo_model$simulation$HFC_tot - S_modelData$HFC_tot
+
+Exo_model$simulation$PFC_tot - S_modelData$PFC_tot
+
+Exo_model$simulation$SF6_tot - S_modelData$SF6_tot
+
+
+Exo_model$simulation$b2_nfc_r - S_modelData$b2_nfc_r
+Exo_model$simulation$b2_fc_r - S_modelData$b2_fc_r
+Exo_model$simulation$b2_g_r - S_modelData$b2_g_r
+Exo_model$simulation$b2_h_r - S_modelData$b2_h_r
+
+
+```
+
+
+Defining variables:
+
+```{r}
+pconk_bs=Exo_model$simulation$pconk
+yk_bs=Exo_model$simulation$yk
+ik_bs=Exo_model$simulation$ik
+xk_bs=Exo_model$simulation$xk
+imk_bs=Exo_model$simulation$imk
+emp_bs=Exo_model$simulation$emp_tot
+
+```
+
+
+
+# Model evaluation:
+
+
+```{r, fig.width=20, fig.height=15}
+
+par(mfrow = c(3, 3), oma = c(0, 0, 3, 0))  # oma sets the outer margins
+
+theme_journal()
+
+plot(Exo_model$simulation$Xk_dom_1, col= "red", ylab= "B. DKR" , main= "Agriculture", lwd=3, xlab="" , cex.main=2); lines(S_modelData$Xk_dom_1, col = "blue", lwd=3, xlab="",cex = 1.5); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+plot(Exo_model$simulation$Xk_dom_2, col= "red", ylab= "B. DKR" , main= "Forresty", lwd=3, xlab="" , cex.main=2); lines(S_modelData$Xk_dom_2, col = "blue", lwd=3, xlab="",cex = 1.5); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+plot(Exo_model$simulation$Xk_dom_3, col= "red", ylab= "B. DKR" , main= "Fishery", lwd=3, xlab="", ylim= c(3.5,6) , cex.main=2); lines(S_modelData$Xk_dom_3, col = "blue", lwd=3, xlab="",cex = 1.5); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+plot(Exo_model$simulation$Xk_dom_4, col= "red", ylab= "B. DKR" , main= "Mining", lwd=3, xlab="",ylim= c(30,86) , cex.main=2); lines(S_modelData$Xk_dom_4, col = "blue", lwd=3, xlab="",cex = 1.5); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+plot(Exo_model$simulation$Xk_dom_5, col= "red", ylab= "B. DKR" , main= "Manufacturing food", lwd=3, xlab="" , cex.main=2); lines(S_modelData$Xk_dom_5, col = "blue", lwd=3, xlab="",cex = 1.5); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+plot(Exo_model$simulation$Xk_dom_6, col= "red", ylab= "B. DKR" , main= "Energy supply and refinaries", lwd=3, xlab="" ,ylim= c(80,100), cex.main=2); lines(S_modelData$Xk_dom_6, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+plot(Exo_model$simulation$Xk_dom_7, col= "red", ylab= "B. DKR" , main= "Energy intensive industries", lwd=3, xlab="" , cex.main=2); lines(S_modelData$Xk_dom_7, col = "blue", lwd=3, xlab="",cex = 1.5); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+plot(Exo_model$simulation$Xk_dom_8, col= "red", ylab= "B. DKR" , main= "Financial corporations", lwd=3, xlab="" , cex.main=2); lines(S_modelData$Xk_dom_8, col = "blue", lwd=3, xlab="",cex = 1.5); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+plot(Exo_model$simulation$Xk_dom_9, col= "red", ylab= "B. DKR" , main= "Other industries", lwd=3, xlab="" , cex.main=2); lines(S_modelData$Xk_dom_9, col = "blue", lwd=3, xlab="",cex = 1.5); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+# Adding a collective title for both plots
+mtext("Real sales in the nine industries", side = 3, outer = TRUE, line = 1, cex = 1.5)
+
+```
+
+```{r, fig.width=20, fig.height=15}
+
+par(mfrow = c(3, 3), oma = c(0, 0, 3, 0))  # oma sets the outer margins
+
+theme_journal()
+
+plot(Exo_model$simulation$exk_im_1, col= "red", ylab= "B. DKR" , main= "Agriculture", lwd=3, xlab="" , cex.main=2); lines(S_modelData$exk_im_1, col = "blue", lwd=3, xlab="",cex = 1.5); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+plot(Exo_model$simulation$exk_2, col= "red", ylab= "B. DKR" , main= "Forresty", lwd=3, xlab="" , cex.main=2); lines(S_modelData$exk_2, col = "blue", lwd=3, xlab="",cex = 1.5); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+plot(Exo_model$simulation$exk_3, col= "red", ylab= "B. DKR" , main= "Fishery", lwd=3, xlab="", ylim= c(3.5,6) , cex.main=2); lines(S_modelData$exk_3, col = "blue", lwd=3, xlab="",cex = 1.5); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+plot(Exo_model$simulation$exk_4, col= "red", ylab= "B. DKR" , main= "Mining", lwd=3, xlab="",ylim= c(30,86) , cex.main=2); lines(S_modelData$exk_4, col = "blue", lwd=3, xlab="",cex = 1.5); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+plot(Exo_model$simulation$exk_5, col= "red", ylab= "B. DKR" , main= "Manufacturing food", lwd=3, xlab="" , cex.main=2); lines(S_modelData$exk_5, col = "blue", lwd=3, xlab="",cex = 1.5); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+plot(Exo_model$simulation$exk_6, col= "red", ylab= "B. DKR" , main= "Energy supply and refinaries", lwd=3, xlab="" ,ylim= c(80,100), cex.main=2); lines(S_modelData$exk_6, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+plot(Exo_model$simulation$exk_7, col= "red", ylab= "B. DKR" , main= "Energy intensive industries", lwd=3, xlab="" , cex.main=2); lines(S_modelData$exk_7, col = "blue", lwd=3, xlab="",cex = 1.5); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+plot(Exo_model$simulation$exk_8, col= "red", ylab= "B. DKR" , main= "Financial corporations", lwd=3, xlab="" , cex.main=2); lines(S_modelData$exk_8, col = "blue", lwd=3, xlab="",cex = 1.5); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+plot(Exo_model$simulation$exk_9, col= "red", ylab= "B. DKR" , main= "Other industries", lwd=3, xlab="" , cex.main=2); lines(S_modelData$exk_9, col = "blue", lwd=3, xlab="",cex = 1.5); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+# Adding a collective title for both plots
+mtext("Real sales in the nine industries", side = 3, outer = TRUE, line = 1, cex = 1.5)
+
+```
+
+
+
+```{r, fig.width=20, fig.height=10}
+
+par(mfrow = c(2, 3), oma = c(0, 0, 3, 0))  # oma sets the outer margins
+
+theme_journal()
+
+plot(pconk_bs, col= "red", ylab= "B. DKR" , main= "Domestic consumption", ylim=c(650,1500), lwd=3, xlab="", cex.main=1.8); lines(S_modelData$pcon_2010_pout, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+
+plot(yk_bs, col= "red", ylab= "B. DKR" , main= "Real GDP", ylim=c(1300,2300) , lwd=3, xlab="", cex.main=1.8); lines(S_modelData$yk, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid() 
+
+
+plot(ik_bs, col= "red", ylab= "B. DKR" , main= "Real Investments", ylim=c(250,600) , lwd=3, xlab="", cex.main=1.8); lines(S_modelData$inv_2010_pout, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+
+plot(xk_bs, col= "red", ylab= "B. DKR" , main= "Real export", ylim=c(500,1300) , lwd=3, xlab="", cex.main=1.8); lines(S_modelData$ex_2010_pout, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+
+plot(imk_bs, col= "red", ylab= "B. DKR" , main= "Real imports", ylim=c(400,1200) , lwd=3, xlab="", cex.main=1.8); lines(S_modelData$imk, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); grid()
+
+plot(emp_bs, col= "red", ylab= "1000 people" , main= "employment" , lwd=3, xlab="", cex.main=1.8); 
+lines(S_modelData$emp_tot, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=2); 
+grid()
+
+
+# Adding a collective title for both plots
+mtext("Aggregate variables", side = 3, outer = TRUE, line = 1, cex = 1.5)
+
+```
+
+```{r}
+env_ntax_tot_bs = Exo_model$simulation$env_ntax_1 + Exo_model$simulation$env_ntax_2 + Exo_model$simulation$env_ntax_3 + Exo_model$simulation$env_ntax_4 + Exo_model$simulation$env_ntax_5 + Exo_model$simulation$env_ntax_6 + Exo_model$simulation$env_ntax_7
+
+env_ntax_tot = S_modelData$env_ntax_1 + S_modelData$env_ntax_2 + S_modelData$env_ntax_3 + S_modelData$env_ntax_4 + S_modelData$env_ntax_5 + S_modelData$env_ntax_6 + S_modelData$env_ntax_7
+```
+
+
+```{r, fig.width=20, fig.height=10}
+
+par(mfrow = c(2, 3), oma = c(0, 0, 3, 0))  # oma sets the outer margins
+
+theme_journal()
+
+plot(Exo_model$simulation$CH4_tot/1000000000*25, col= "red", ylab= "Million tons CO2-equivelant" , main= "CO2E emissions related to CH4", lwd=3, xlab="", ylim=c(6.7,8.5), cex.main=1.5); lines(S_modelData$CH4_tot/1000000000*25, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=1.5); grid()
+
+plot(Exo_model$simulation$N2O_tot/1000000000*298, col= "red", ylab= "Million tons CO2-equivelant" , main= "CO2E emissions related to N2O", lwd=3, xlab="", ylim=c(5,7.5), cex.main=1.5); lines(S_modelData$N2O_tot/1000000000*298, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=1.5); grid()
+grid()
+
+plot(Exo_model$simulation$Co2_tot/1000000000, col= "red", ylab= "Million tons CO2-equivelant" , main= "CO2E emissions related to CO2", lwd=3, xlab="", ylim=c(80,120), cex.main=1.5); lines(S_modelData$Co2_tot/1000000000, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=1.5); grid()
+
+plot(Exo_model$simulation$HFC_tot/1000000000, col= "red", ylab= "Million tons CO2-equivelant" , main= "CO2E emissions related to HFC", lwd=3, xlab="", cex.main=1.5); lines(S_modelData$HFC_tot/1000000000, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=1.5); grid()
+
+plot(Exo_model$simulation$PFC_tot/1000000000, col= "red", ylab= "Million tons CO2-equivelant" , main= "CO2E emissions related to PFC", lwd=3, xlab="", ylim=c(0,0.035), cex.main=1.5); lines(S_modelData$PFC_tot/1000000000, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=1.5); grid()
+
+plot(Exo_model$simulation$SF6_tot/1000000000, col= "red", ylab= "Million tons CO2-equivelant" , main= "CO2E emissions related to SF6", lwd=3, xlab="", cex.main=1.5); lines(S_modelData$SF6_tot/1000000000, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=1.5); grid()
+
+
+# Adding a collective title for both plots
+mtext("Aggregate Emissions", side = 3, outer = TRUE, line = 1, cex = 1.5)
+
+
+```
+
+
+
+```{r, fig.width=15, fig.height=7}
+
+par(mfrow=c(1,2))
+
+
+plot(Exo_model$simulation$rer_9, col= "red", ylab= "1000 Tons Co2" , main= "Total Co2-E emission" , lwd=3, xlab=""); lines(S_modelData$rer_1, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue")); grid()
+
+plot(Exo_model$simulation$rer_5, col= "red", ylab= "B. DKK" , main= "Co2-E emission Agriculture" , xlim= c(1998,2020) , lwd=3, xlab=""); lines(S_modelData$rer_5, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Model (baseline)", "Data"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue")); grid()
+
+
+```
+
+
+
+# Consistency checks
+
+```{r, fig.width=15, fig.height=7}
+
+par(mfrow=c(1,2))
+
+plot(Exo_model$simulation$check_sec/Exo_model$simulation$y, col= "red", ylab= "" , main= "check_sec/y", ylim=c(-0.001,0.001), lwd=3, xlab="");grid()
+
+plot(Exo_model$simulation$check_nl/Exo_model$simulation$y, col= "red", ylab= "" , main= "check_nl/y", ylim=c(-0.001,0.001), lwd=3, xlab="");grid()
+
+```
+
+
+
+
+
+# Scenario 1
+
+
+
+```{r}
+
+Scenario_1_shock= S_modelData$Scenario_1 %>% window(start= c(2010,1))
+```
+
+
+
+```{r}
+# Define add-factor list (defining shock)
+constantAdjList_s1 <- list(
+  
+Scenario_1 = TIMESERIES(Scenario_1_shock+1 ,START=c(2010,1),  FREQ=1)
+ 
+)
+
+```
+
+```{r, results='hide'}
+# Simulate the model (following shock)
+Exo_model_S1 <- SIMULATE(S_model
+                    ,simType='dynamic'
+                    ,TSRANGE=c(1998,1,2019,1)
+                    ,simConvergence=0.00001
+                    ,simIterLimit=100
+                    ,ConstantAdjustment=constantAdjList_s1
+                    )
+```
+
+
+```{r}
+Exo_model_S1$simulation$check_nl 
+Exo_model_S1$simulation$check_sec
+Exo_model_S1$simulation$check_np
+Exo_model_S1$simulation$check_ctr
+Exo_model_S1$simulation$check_invest
+Exo_model_S1$simulation$check_tax
+
+
+test_1=Exo_model_S1$simulation$s_ck_oth - Exo_model$simulation$s_ck_oth
+test_2=Exo_model_S1$simulation$s_ck_110 - Exo_model$simulation$s_ck_110
+test_3=Exo_model_S1$simulation$s_ck_120 - Exo_model$simulation$s_ck_120
+test_4=Exo_model_S1$simulation$s_ck_130 - Exo_model$simulation$s_ck_130
+test_5=Exo_model_S1$simulation$s_ck_140 - Exo_model$simulation$s_ck_140
+test_6=Exo_model_S1$simulation$s_ck_160 - Exo_model$simulation$s_ck_160
+test_7=Exo_model_S1$simulation$s_ck_180 - Exo_model$simulation$s_ck_180
+
+test_1 + test_2 + test_3 + test_4 +test_5 + test_6 + test_7
+
+
+
+Exo_model_S1$simulation$s_ck_oth + Exo_model_S1$simulation$s_ck_110 + Exo_model_S1$simulation$s_ck_120 + Exo_model_S1$simulation$s_ck_130 + Exo_model_S1$simulation$s_ck_140 + Exo_model_S1$simulation$s_ck_160 + Exo_model_S1$simulation$s_ck_180
+
+
+(Exo_model_S1$simulation$yk - Exo_model$simulation$yk)/(Exo_model_S1$simulation$gk - Exo_model$simulation$gk)
+
+
+```
+
+
+## Plots
+
+
+```{r, fig.width=20, fig.height=10}
+
+par(mfrow=c(2,3), oma = c(0, 0, 3, 0))  # oma sets the outer margins
+
+# Apply the theme
+theme_journal()
+
+plot((Exo_model_S1$simulation$yk - Exo_model$simulation$yk)/Exo_model$simulation$yk*100, col= "red", ylab= "Percentage change from Baseline" , main= "Real GDP" , xlim= c(c(1998,2020)), lwd=3, xlab="", cex.main=1.8);grid()
+
+plot((Exo_model_S1$simulation$pconk - Exo_model$simulation$pconk)/Exo_model$simulation$pconk*100, col= "red", ylab= "Percentage change from Baseline" , main= "Real Consumption" , xlim= c(c(1998,2020)), lwd=3, xlab="", cex.main=1.8);grid()
+
+plot((Exo_model_S1$simulation$ik - Exo_model$simulation$ik)/Exo_model$simulation$ik*100, col= "red", ylab= "Percentage change from Baseline" , main= "Real Investment" , xlim= c(c(1998,2020)), lwd=3, xlab="", cex.main=1.8);grid()
+
+plot((Exo_model_S1$simulation$xk - Exo_model$simulation$xk)/Exo_model$simulation$xk*100, col= "red", ylab= "Percentage change from Baseline" , main= "Real Export",ylim=c(0,1), xlim= c(c(1998,2020)), lwd=3, xlab="", cex.main=1.8);grid()
+
+plot((Exo_model_S1$simulation$imk - Exo_model$simulation$imk)/Exo_model$simulation$imk*100, col= "red", ylab= "Percentage change from Baseline" , main= "Real Import" , xlim= c(c(1998,2020)), lwd=3, xlab="", cex.main=1.8);grid()
+
+plot((Exo_model_S1$simulation$emp_tot - Exo_model$simulation$emp_tot)/Exo_model$simulation$emp_tot*100, col= "red", ylab= "Percentage change from Baseline" , main= "Employment" , xlim= c(c(1998,2020)), lwd=3, xlab="", cex.main=1.8);grid()
+
+
+
+
+# Adding a collective title for both plots
+mtext("GDP components", side = 3, outer = TRUE, line = 1, cex = 1.7)
+
+```
+
+
+```{r}
+
+### BASELINE
+zk_dom_1_sales_BS = Exo_model$simulation$zk_dom_11 + Exo_model$simulation$zk_dom_12 + Exo_model$simulation$zk_dom_13 + Exo_model$simulation$zk_dom_14 + Exo_model$simulation$zk_dom_15 + Exo_model$simulation$zk_dom_16 + Exo_model$simulation$zk_dom_17 + Exo_model$simulation$zk_dom_18 + Exo_model$simulation$zk_dom_19 
+
+
+zk_dom_2_sales_BS = Exo_model$simulation$zk_dom_21 + Exo_model$simulation$zk_dom_22 + Exo_model$simulation$zk_dom_23 + Exo_model$simulation$zk_dom_24 + Exo_model$simulation$zk_dom_25 + Exo_model$simulation$zk_dom_26 + Exo_model$simulation$zk_dom_27 + Exo_model$simulation$zk_dom_28 + Exo_model$simulation$zk_dom_29 
+
+
+zk_dom_3_sales_BS = Exo_model$simulation$zk_dom_31 + Exo_model$simulation$zk_dom_32 + Exo_model$simulation$zk_dom_33 + Exo_model$simulation$zk_dom_34 + Exo_model$simulation$zk_dom_35 + Exo_model$simulation$zk_dom_36 + Exo_model$simulation$zk_dom_37 + Exo_model$simulation$zk_dom_38 + Exo_model$simulation$zk_dom_39 
+
+
+zk_dom_4_sales_BS = Exo_model$simulation$zk_dom_41 + Exo_model$simulation$zk_dom_42 + Exo_model$simulation$zk_dom_43 + Exo_model$simulation$zk_dom_44 + Exo_model$simulation$zk_dom_45 + Exo_model$simulation$zk_dom_46 + Exo_model$simulation$zk_dom_47 + Exo_model$simulation$zk_dom_48 + Exo_model$simulation$zk_dom_49 
+
+
+zk_dom_5_sales_BS = Exo_model$simulation$zk_dom_51 + Exo_model$simulation$zk_dom_52 + Exo_model$simulation$zk_dom_53 + Exo_model$simulation$zk_dom_54 + Exo_model$simulation$zk_dom_55 + Exo_model$simulation$zk_dom_56 + Exo_model$simulation$zk_dom_57 + Exo_model$simulation$zk_dom_58 + Exo_model$simulation$zk_dom_59 
+
+
+zk_dom_6_sales_BS = Exo_model$simulation$zk_dom_61 + Exo_model$simulation$zk_dom_62 + Exo_model$simulation$zk_dom_63 + Exo_model$simulation$zk_dom_64 + Exo_model$simulation$zk_dom_65 + Exo_model$simulation$zk_dom_66 + Exo_model$simulation$zk_dom_67 + Exo_model$simulation$zk_dom_68 + Exo_model$simulation$zk_dom_69 
+
+
+zk_dom_7_sales_BS = Exo_model$simulation$zk_dom_71 + Exo_model$simulation$zk_dom_72 + Exo_model$simulation$zk_dom_73 + Exo_model$simulation$zk_dom_74 + Exo_model$simulation$zk_dom_75 + Exo_model$simulation$zk_dom_76 + Exo_model$simulation$zk_dom_77 + Exo_model$simulation$zk_dom_78 + Exo_model$simulation$zk_dom_79 
+
+
+zk_dom_8_sales_BS = Exo_model$simulation$zk_dom_81 + Exo_model$simulation$zk_dom_82 + Exo_model$simulation$zk_dom_83 + Exo_model$simulation$zk_dom_84 + Exo_model$simulation$zk_dom_85 + Exo_model$simulation$zk_dom_86 + Exo_model$simulation$zk_dom_87 + Exo_model$simulation$zk_dom_88 + Exo_model$simulation$zk_dom_89 
+
+
+zk_dom_9_sales_BS = Exo_model$simulation$zk_dom_91 + Exo_model$simulation$zk_dom_92 + Exo_model$simulation$zk_dom_93 + Exo_model$simulation$zk_dom_94 + Exo_model$simulation$zk_dom_95 + Exo_model$simulation$zk_dom_96 + Exo_model$simulation$zk_dom_97 + Exo_model$simulation$zk_dom_98 + Exo_model$simulation$zk_dom_99 
+```
+
+
+
+```{r}
+
+#### SCENARIO 3
+zk_dom_1_sales_S1 = Exo_model_S1$simulation$zk_dom_11 + Exo_model_S1$simulation$zk_dom_12 + Exo_model_S1$simulation$zk_dom_13 + Exo_model_S1$simulation$zk_dom_14 + Exo_model_S1$simulation$zk_dom_15 + Exo_model_S1$simulation$zk_dom_16 + Exo_model_S1$simulation$zk_dom_17 + Exo_model_S1$simulation$zk_dom_18 + Exo_model_S1$simulation$zk_dom_19 
+
+
+zk_dom_2_sales_S1 = Exo_model_S1$simulation$zk_dom_21 + Exo_model_S1$simulation$zk_dom_22 + Exo_model_S1$simulation$zk_dom_23 + Exo_model_S1$simulation$zk_dom_24 + Exo_model_S1$simulation$zk_dom_25 + Exo_model_S1$simulation$zk_dom_26 + Exo_model_S1$simulation$zk_dom_27 + Exo_model_S1$simulation$zk_dom_28 + Exo_model_S1$simulation$zk_dom_29 
+
+
+zk_dom_3_sales_S1 = Exo_model_S1$simulation$zk_dom_31 + Exo_model_S1$simulation$zk_dom_32 + Exo_model_S1$simulation$zk_dom_33 + Exo_model_S1$simulation$zk_dom_34 + Exo_model_S1$simulation$zk_dom_35 + Exo_model_S1$simulation$zk_dom_36 + Exo_model_S1$simulation$zk_dom_37 + Exo_model_S1$simulation$zk_dom_38 + Exo_model_S1$simulation$zk_dom_39 
+
+
+zk_dom_4_sales_S1 = Exo_model_S1$simulation$zk_dom_41 + Exo_model_S1$simulation$zk_dom_42 + Exo_model_S1$simulation$zk_dom_43 + Exo_model_S1$simulation$zk_dom_44 + Exo_model_S1$simulation$zk_dom_45 + Exo_model_S1$simulation$zk_dom_46 + Exo_model_S1$simulation$zk_dom_47 + Exo_model_S1$simulation$zk_dom_48 + Exo_model_S1$simulation$zk_dom_49 
+
+
+zk_dom_5_sales_S1 = Exo_model_S1$simulation$zk_dom_51 + Exo_model_S1$simulation$zk_dom_52 + Exo_model_S1$simulation$zk_dom_53 + Exo_model_S1$simulation$zk_dom_54 + Exo_model_S1$simulation$zk_dom_55 + Exo_model_S1$simulation$zk_dom_56 + Exo_model_S1$simulation$zk_dom_57 + Exo_model_S1$simulation$zk_dom_58 + Exo_model_S1$simulation$zk_dom_59 
+
+
+zk_dom_6_sales_S1 = Exo_model_S1$simulation$zk_dom_61 + Exo_model_S1$simulation$zk_dom_62 + Exo_model_S1$simulation$zk_dom_63 + Exo_model_S1$simulation$zk_dom_64 + Exo_model_S1$simulation$zk_dom_65 + Exo_model_S1$simulation$zk_dom_66 + Exo_model_S1$simulation$zk_dom_67 + Exo_model_S1$simulation$zk_dom_68 + Exo_model_S1$simulation$zk_dom_69 
+
+
+zk_dom_7_sales_S1 = Exo_model_S1$simulation$zk_dom_71 + Exo_model_S1$simulation$zk_dom_72 + Exo_model_S1$simulation$zk_dom_73 + Exo_model_S1$simulation$zk_dom_74 + Exo_model_S1$simulation$zk_dom_75 + Exo_model_S1$simulation$zk_dom_76 + Exo_model_S1$simulation$zk_dom_77 + Exo_model_S1$simulation$zk_dom_78 + Exo_model_S1$simulation$zk_dom_79 
+
+
+zk_dom_8_sales_S1 = Exo_model_S1$simulation$zk_dom_81 + Exo_model_S1$simulation$zk_dom_82 + Exo_model_S1$simulation$zk_dom_83 + Exo_model_S1$simulation$zk_dom_84 + Exo_model_S1$simulation$zk_dom_85 + Exo_model_S1$simulation$zk_dom_86 + Exo_model_S1$simulation$zk_dom_87 + Exo_model_S1$simulation$zk_dom_88 + Exo_model_S1$simulation$zk_dom_89 
+
+
+zk_dom_9_sales_S1 = Exo_model_S1$simulation$zk_dom_91 + Exo_model_S1$simulation$zk_dom_92 + Exo_model_S1$simulation$zk_dom_93 + Exo_model_S1$simulation$zk_dom_94 + Exo_model_S1$simulation$zk_dom_95 + Exo_model_S1$simulation$zk_dom_96 + Exo_model_S1$simulation$zk_dom_97 + Exo_model_S1$simulation$zk_dom_98 + Exo_model_S1$simulation$zk_dom_99 
+```
+
+
+
+
+
+```{r, fig.height=10, fig.width=15}
+
+# Setting up a 1x2 layout for the plots
+par(mfrow = c(2, 2), oma = c(0, 0, 3, 0))  # oma sets the outer margins
+
+# First plot
+plot((Exo_model_S1$simulation$Xk_dom_1 - Exo_model$simulation$Xk_dom_1)/Exo_model$simulation$Xk_dom_1*100,
+     col = "red", ylab = "% change from baseline", main = "Total sales", lwd = 3, ylim = c(-2, 2.5))
+lines((Exo_model_S1$simulation$Xk_dom_2 - Exo_model$simulation$Xk_dom_2)/Exo_model$simulation$Xk_dom_2*100, col = "blue", lwd = 3)
+lines((Exo_model_S1$simulation$Xk_dom_3 - Exo_model$simulation$Xk_dom_3)/Exo_model$simulation$Xk_dom_3*100, col = "green", lwd = 3)
+lines((Exo_model_S1$simulation$Xk_dom_4 - Exo_model$simulation$Xk_dom_4)/Exo_model$simulation$Xk_dom_4*100, col = "black", lwd = 3)
+lines((Exo_model_S1$simulation$Xk_dom_5 - Exo_model$simulation$Xk_dom_5)/Exo_model$simulation$Xk_dom_5*100, col = "orange", lwd = 3)
+lines((Exo_model_S1$simulation$Xk_dom_6 - Exo_model$simulation$Xk_dom_6)/Exo_model$simulation$Xk_dom_6*100, col = "yellow", lwd = 3)
+lines((Exo_model_S1$simulation$Xk_dom_7 - Exo_model$simulation$Xk_dom_7)/Exo_model$simulation$Xk_dom_7*100, col = "pink", lwd = 3)
+lines((Exo_model_S1$simulation$Xk_dom_8 - Exo_model$simulation$Xk_dom_8)/Exo_model$simulation$Xk_dom_8*100, col = "darkgreen", lwd = 3)
+lines((Exo_model_S1$simulation$Xk_dom_9 - Exo_model$simulation$Xk_dom_9)/Exo_model$simulation$Xk_dom_9*100, col = "darkblue", lwd = 3)
+legend("topleft", legend = c("Industry 1 (Agriculture)", "Industry 2 (Forestry)", "Industry 3 (Fishery)",
+                             "Industry 4 (Mining)", "Industry 5 (Manu. food)", "Industry 6 (Energy prod.)",
+                             "Industry 7 (Energy inten.)", "Industry 8 (Financial corp.)", "Industry 9 (other industries)"),
+       lty = 1, lwd = 2, bty = "n", col = c("red", "blue", "green", "black", "orange", "yellow", "pink", "darkgreen", "darkblue"))
+grid()
+
+# Second plot
+plot((Exo_model_S1$simulation$ck_dom_1 - Exo_model$simulation$ck_dom_1)/Exo_model$simulation$ck_dom_1*100,
+     col = "red", ylab = "% change from baseline", main = "Real final consumption", lwd = 3, ylim = c(0, 2))
+lines((Exo_model_S1$simulation$ck_dom_2 - Exo_model$simulation$ck_dom_2)/Exo_model$simulation$ck_dom_2*100, col = "blue", lwd = 3)
+lines((Exo_model_S1$simulation$ck_dom_3 - Exo_model$simulation$ck_dom_3)/Exo_model$simulation$ck_dom_3*100, col = "green", lwd = 3)
+lines((Exo_model_S1$simulation$ck_dom_4 - Exo_model$simulation$ck_dom_4)/Exo_model$simulation$ck_dom_4*100, col = "black", lwd = 3)
+lines((Exo_model_S1$simulation$ck_dom_5 - Exo_model$simulation$ck_dom_5)/Exo_model$simulation$ck_dom_5*100, col = "orange", lwd = 3)
+lines((Exo_model_S1$simulation$ck_dom_6 - Exo_model$simulation$ck_dom_6)/Exo_model$simulation$ck_dom_6*100, col = "yellow", lwd = 3)
+lines((Exo_model_S1$simulation$ck_dom_7 - Exo_model$simulation$ck_dom_7)/Exo_model$simulation$ck_dom_7*100, col = "pink", lwd = 3)
+lines((Exo_model_S1$simulation$ck_dom_8 - Exo_model$simulation$ck_dom_8)/Exo_model$simulation$ck_dom_8*100, col = "darkgreen", lwd = 3)
+lines((Exo_model_S1$simulation$ck_dom_9 - Exo_model$simulation$ck_dom_9)/Exo_model$simulation$ck_dom_9*100, col = "darkblue", lwd = 3)
+legend("topleft", legend = c("Industry 1 (Agriculture)", "Industry 2 (Forestry)", "Industry 3 (Fishery)",
+                                "Industry 4 (Mining)", "Industry 5 (Manu. food)", "Industry 6 (Energy prod.)",
+                                "Industry 7 (Energy inten.)", "Industry 8 (Financial corp.)", "Industry 9 (other industries)"),
+       lty = 1, lwd = 2, bty = "n", col = c("red", "blue", "green", "black", "orange", "yellow", "pink", "darkgreen", "darkblue"))
+grid()
+
+
+plot((Exo_model_S1$simulation$exk_dom_1 - Exo_model$simulation$exk_dom_1)/Exo_model$simulation$exk_dom_1*100,
+     col = "red", ylab = "% change from baseline", main = "Real exports", lwd = 3, ylim = c(0, 0.5))
+lines((Exo_model_S1$simulation$exk_dom_2 - Exo_model$simulation$exk_dom_2)/Exo_model$simulation$exk_dom_2*100, col = "blue", lwd = 3)
+lines((Exo_model_S1$simulation$exk_dom_3 - Exo_model$simulation$exk_dom_3)/Exo_model$simulation$exk_dom_3*100, col = "green", lwd = 3)
+lines((Exo_model_S1$simulation$exk_dom_4 - Exo_model$simulation$exk_dom_4)/Exo_model$simulation$exk_dom_4*100, col = "black", lwd = 3)
+lines((Exo_model_S1$simulation$exk_dom_5 - Exo_model$simulation$exk_dom_5)/Exo_model$simulation$exk_dom_5*100, col = "orange", lwd = 3)
+lines((Exo_model_S1$simulation$exk_dom_6 - Exo_model$simulation$exk_dom_6)/Exo_model$simulation$exk_dom_6*100, col = "yellow", lwd = 3)
+lines((Exo_model_S1$simulation$exk_dom_7 - Exo_model$simulation$exk_dom_7)/Exo_model$simulation$exk_dom_7*100, col = "pink", lwd = 3)
+lines((Exo_model_S1$simulation$exk_dom_8 - Exo_model$simulation$exk_dom_8)/Exo_model$simulation$exk_dom_8*100, col = "darkgreen", lwd = 3)
+lines((Exo_model_S1$simulation$exk_dom_9 - Exo_model$simulation$exk_dom_9)/Exo_model$simulation$exk_dom_9*100, col = "darkblue", lwd = 3)
+legend("topleft", legend = c("Industry 1 (Agriculture)", "Industry 2 (Forestry)", "Industry 3 (Fishery)",
+                                "Industry 4 (Mining)", "Industry 5 (Manu. food)", "Industry 6 (Energy prod.)",
+                                "Industry 7 (Energy inten.)", "Industry 8 (Financial corp.)", "Industry 9 (other industries)"),
+       lty = 1, lwd = 2, bty = "n", col = c("red", "blue", "green", "black", "orange", "yellow", "pink", "darkgreen", "darkblue"))
+grid()
+
+
+plot((zk_dom_1_sales_S1- zk_dom_1_sales_BS)/zk_dom_1_sales_BS*100,
+     col = "red", ylab = "% change from baseline", main = "Real intermediate consumption", lwd = 3, ylim = c(0, 2))
+lines((zk_dom_2_sales_S1 - zk_dom_2_sales_BS)/zk_dom_2_sales_BS*100, col = "blue", lwd = 3)
+lines((zk_dom_3_sales_S1 - zk_dom_3_sales_BS)/zk_dom_3_sales_BS*100, col = "green", lwd = 3)
+lines((zk_dom_4_sales_S1 - zk_dom_4_sales_BS)/zk_dom_4_sales_BS*100, col = "black", lwd = 3)
+lines((zk_dom_5_sales_S1 - zk_dom_5_sales_BS)/zk_dom_5_sales_BS*100, col = "orange", lwd = 3)
+lines((zk_dom_6_sales_S1 - zk_dom_6_sales_BS)/zk_dom_6_sales_BS*100, col = "yellow", lwd = 3)
+lines((zk_dom_7_sales_S1 - zk_dom_7_sales_BS)/zk_dom_7_sales_BS*100, col = "pink", lwd = 3)
+lines((zk_dom_8_sales_S1 - zk_dom_8_sales_BS)/zk_dom_8_sales_BS*100, col = "darkgreen", lwd = 3)
+lines((zk_dom_9_sales_S1 - zk_dom_9_sales_BS)/zk_dom_9_sales_BS*100, col = "darkblue", lwd = 3)
+legend("topleft", legend = c("Industry 1 (Agriculture)", "Industry 2 (Forestry)", "Industry 3 (Fishery)",
+                                "Industry 4 (Mining)", "Industry 5 (Manu. food)", "Industry 6 (Energy prod.)",
+                                "Industry 7 (Energy inten.)", "Industry 8 (Financial corp.)", "Industry 9 (other industries)"),
+       lty = 1, lwd = 2, bty = "n", col = c("red", "blue", "green", "black", "orange", "yellow", "pink", "darkgreen", "darkblue"))
+grid()
+
+
+# Adding a collective title for both plots
+mtext("Industry sales components", side = 3, outer = TRUE, line = 1, cex = 1.5)
+
+
+
+```
+
+
+
+
+# Scenario 2 Carbon tax
+
+
+```{r}
+
+Scenario_2_shock= S_modelData$Scenario_2 %>% window(start= c(2010,1))
+```
+
+
+
+```{r}
+# Define add-factor list (defining shock)
+constantAdjList_s2 <- list(
+
+Scenario_2 = TIMESERIES(Scenario_2_shock+1 ,START=c(2010,1),  FREQ=1)
+)
+
+```
+
+```{r, results='hide'}
+# Simulate the model (following shock)
+Exo_model_S2 <- SIMULATE(S_model
+                    ,simType='dynamic'
+                    ,TSRANGE=c(1998,1,2019,1)
+                    ,simConvergence=0.00001
+                    ,simIterLimit=100
+                    ,ConstantAdjustment=constantAdjList_s2
+                    )
+```
+
+
+
+
+
+```{r}
+
+Exo_model_S2$simulation$check_nl 
+Exo_model_S2$simulation$check_sec
+Exo_model_S2$simulation$check_np
+Exo_model_S2$simulation$check_ctr
+Exo_model_S2$simulation$check_invest
+Exo_model_S2$simulation$check_tax
+
+
+
+
+Exo_model_S2$simulation$s_ck_oth - Exo_model$simulation$s_ck_oth 
+Exo_model_S2$simulation$s_ck_110 - Exo_model$simulation$s_ck_110
+Exo_model_S2$simulation$s_ck_120 - Exo_model$simulation$s_ck_120
+Exo_model_S2$simulation$s_ck_130 - Exo_model$simulation$s_ck_130
+Exo_model_S2$simulation$s_ck_140 - Exo_model$simulation$s_ck_140
+Exo_model_S2$simulation$s_ck_160 - Exo_model$simulation$s_ck_160
+Exo_model_S2$simulation$s_ck_180 - Exo_model$simulation$s_ck_180
+
+
+Exo_model_S2$simulation$s_ck_oth + Exo_model_S2$simulation$s_ck_110 + Exo_model_S2$simulation$s_ck_120 + Exo_model_S2$simulation$s_ck_130 + Exo_model_S2$simulation$s_ck_140 + Exo_model_S2$simulation$s_ck_160 + Exo_model_S2$simulation$s_ck_180
+
+
+
+
+```
+
+
+
+## Plots
+
+
+
+
+
+
+
+```{r, fig.height=10, fig.width=15}
+par(mfrow = c(2, 2), oma = c(0, 0, 3, 0))  # oma sets the outer margins
+
+theme_journal()
+
+plot((Exo_model_S2$simulation$opt_1 - Exo_model$simulation$opt_1), col= "red", ylab= "Level change from baseline" , main= "Other production taxes", lwd=3, ylim= c(-0,6));
+lines((Exo_model_S2$simulation$opt_2 - Exo_model$simulation$opt_2), col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S2$simulation$opt_3 - Exo_model$simulation$opt_3), col = "green", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$opt_4 - Exo_model$simulation$opt_4), col = "black", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$opt_5 - Exo_model$simulation$opt_5), col = "orange", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$opt_6 - Exo_model$simulation$opt_6), col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$opt_7 - Exo_model$simulation$opt_7), col = "pink", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$opt_8 - Exo_model$simulation$opt_8), col = "darkgreen", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$opt_9 - Exo_model$simulation$opt_9), col = "darkblue", lwd=3, xlab="");
+legend("topleft",legend=c("Industry 1 (Agriculture)", "Industry 2 (Forresty)","Industry 3 (Fishery)","Industry 4 (Mining)","Industry 5 (Manu. food)","Industry 6 (Energy prod.)","Industry 7 (Energy inten.)","Industry 8 (Financial corp.)","Industry 9 (other industries)"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink", "darkgreen", "darkblue")); grid()
+
+
+plot((Exo_model_S2$simulation$pout_1 - Exo_model$simulation$pout_1)/Exo_model$simulation$pout_1*100, col= "red", ylab= "% change from baseline" , main= "Industry prices", lwd=3, ylim= c(-2,10));
+lines((Exo_model_S2$simulation$pout_2 - Exo_model$simulation$pout_2)/Exo_model$simulation$pout_2*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S2$simulation$pout_3 - Exo_model$simulation$pout_3)/Exo_model$simulation$pout_3*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$pout_4 - Exo_model$simulation$pout_4)/Exo_model$simulation$pout_4*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$pout_5 - Exo_model$simulation$pout_5)/Exo_model$simulation$pout_5*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$pout_6 - Exo_model$simulation$pout_6)/Exo_model$simulation$pout_6*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$pout_7 - Exo_model$simulation$pout_7)/Exo_model$simulation$pout_7*100, col = "pink", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$pout_8 - Exo_model$simulation$pout_8)/Exo_model$simulation$pout_8*100, col = "darkgreen", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$pout_9 - Exo_model$simulation$pout_9)/Exo_model$simulation$pout_9*100, col = "darkblue", lwd=3, xlab="");
+legend("topleft",legend=c("Industry 1 (Agriculture)", "Industry 2 (Forresty)","Industry 3 (Fishery)","Industry 4 (Mining)","Industry 5 (Manu. food)","Industry 6 (Energy prod.)","Industry 7 (Energy inten.)","Industry 8 (Financial corp.)","Industry 9 (other industries)"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink", "darkgreen", "darkblue")); grid()
+
+
+
+plot((Exo_model_S2$simulation$ppcon_oth_tot - Exo_model$simulation$ppcon_oth_tot)*100, ylim=c(-0,3),col= "red", ylab= "Change in percentage points" , main= "Final consumption prices", lwd=3, xlab="", cex.main=1);
+lines((Exo_model_S2$simulation$ppcon_110_tot - Exo_model$simulation$ppcon_110_tot)*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S2$simulation$ppcon_120_tot - Exo_model$simulation$ppcon_120_tot)*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$ppcon_130_tot - Exo_model$simulation$ppcon_130_tot)*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$ppcon_140_tot - Exo_model$simulation$ppcon_140_tot)*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$ppcon_160_tot - Exo_model$simulation$ppcon_160_tot)*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$ppcon_180_tot - Exo_model$simulation$ppcon_180_tot)*100, col = "pink", lwd=3 , xlab="");
+lines((Exo_model_S2$simulation$ppcon_food_tot - Exo_model$simulation$ppcon_food_tot)*100, col = "darkblue", lwd=3 , xlab="");
+lines((Exo_model_S2$simulation$ppcon_tax - Exo_model$simulation$ppcon_tax)*100, col = "darkgreen", lwd=3 , xlab="");legend("topleft",legend=c("Other consumption", "Bread consumption","Meat consumption","Fish consumption","Dairy consumption","Fruit and vegetable consumption","Other food consumption","total food","total cons"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink", "darkblue", "darkgreen")); grid()
+
+
+
+
+plot((Exo_model_S2$simulation$ck_oth_tot - Exo_model$simulation$ck_oth_tot)/Exo_model$simulation$ck_oth_tot*100, ylim=c(-2,2),col= "red", ylab= "% change from baseline" , main= "Real consumptions", lwd=3, xlab="", cex.main=1);
+lines((Exo_model_S2$simulation$ck_110_tot - Exo_model$simulation$ck_110_tot)/Exo_model$simulation$ck_110_tot*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S2$simulation$ck_120_tot - Exo_model$simulation$ck_120_tot)/Exo_model$simulation$ck_120_tot*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$ck_130_tot - Exo_model$simulation$ck_130_tot)/Exo_model$simulation$ck_130_tot*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$ck_140_tot - Exo_model$simulation$ck_140_tot)/Exo_model$simulation$ck_140_tot*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$ck_160_tot - Exo_model$simulation$ck_160_tot)/Exo_model$simulation$ck_160_tot*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$ck_180_tot - Exo_model$simulation$ck_180_tot)/Exo_model$simulation$ck_180_tot*100, col = "pink", lwd=3 , xlab=""); legend("bottomleft",legend=c("Other consumption", "Bread consumption","Meat consumption","Fish consumption","Diary consumption","Fruit and vegetable consumption","Other food consumption"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink")); grid()
+
+
+# Adding a collective title for both plots
+mtext("Substitution effect on final consumption", side = 3, outer = TRUE, line = 1, cex = 1.5)
+```
+
+
+
+
+We need to calculate average import shares
+
+
+
+```{r}
+
+#### Industry 1
+z_dom_1_tot_BS = Exo_model$simulation$z_dom_11 + Exo_model$simulation$z_dom_21 + Exo_model$simulation$z_dom_31 + Exo_model$simulation$z_dom_41 + Exo_model$simulation$z_dom_51 + Exo_model$simulation$z_dom_61 + Exo_model$simulation$z_dom_71 + Exo_model$simulation$z_dom_81 + Exo_model$simulation$z_dom_91
+
+zk_dom_1_tot_BS = Exo_model$simulation$zk_dom_11 + Exo_model$simulation$zk_dom_21 + Exo_model$simulation$zk_dom_31 + Exo_model$simulation$zk_dom_41 + Exo_model$simulation$zk_dom_51 + Exo_model$simulation$zk_dom_61 + Exo_model$simulation$zk_dom_71 + Exo_model$simulation$zk_dom_81 + Exo_model$simulation$zk_dom_91
+
+z_im_1_tot_BS = Exo_model$simulation$z_im_11 + Exo_model$simulation$z_im_21 + Exo_model$simulation$z_im_31 + Exo_model$simulation$z_im_41 + Exo_model$simulation$z_im_51 + Exo_model$simulation$z_im_61 + Exo_model$simulation$z_im_71 + Exo_model$simulation$z_im_81 + Exo_model$simulation$z_im_91 + Exo_model$simulation$z_im_un_1
+
+zk_im_1_tot_BS = Exo_model$simulation$zk_im_11 + Exo_model$simulation$zk_im_21 + Exo_model$simulation$zk_im_31 + Exo_model$simulation$zk_im_41 + Exo_model$simulation$zk_im_51 + Exo_model$simulation$zk_im_61 + Exo_model$simulation$zk_im_71 + Exo_model$simulation$zk_im_81 + Exo_model$simulation$zk_im_91 + Exo_model$simulation$zk_im_un_1
+
+z_1_tot_BS = z_dom_1_tot_BS + z_im_1_tot_BS
+
+zk_1_tot_BS = zk_dom_1_tot_BS + zk_im_1_tot_BS
+
+
+
+#### Industry 2
+z_dom_2_tot_BS = Exo_model$simulation$z_dom_12 + Exo_model$simulation$z_dom_22 + Exo_model$simulation$z_dom_32 + Exo_model$simulation$z_dom_42 + Exo_model$simulation$z_dom_52 + Exo_model$simulation$z_dom_62 + Exo_model$simulation$z_dom_72 + Exo_model$simulation$z_dom_82 + Exo_model$simulation$z_dom_92
+
+zk_dom_2_tot_BS = Exo_model$simulation$zk_dom_12 + Exo_model$simulation$zk_dom_22 + Exo_model$simulation$zk_dom_32 + Exo_model$simulation$zk_dom_42 + Exo_model$simulation$zk_dom_52 + Exo_model$simulation$zk_dom_62 + Exo_model$simulation$zk_dom_72 + Exo_model$simulation$zk_dom_82 + Exo_model$simulation$zk_dom_92
+
+z_im_2_tot_BS = Exo_model$simulation$z_im_12 + Exo_model$simulation$z_im_22 + Exo_model$simulation$z_im_32 + Exo_model$simulation$z_im_42 + Exo_model$simulation$z_im_52 + Exo_model$simulation$z_im_62 + Exo_model$simulation$z_im_72 + Exo_model$simulation$z_im_82 + Exo_model$simulation$z_im_92 + Exo_model$simulation$z_im_un_2
+
+zk_im_2_tot_BS = Exo_model$simulation$zk_im_12 + Exo_model$simulation$zk_im_22 + Exo_model$simulation$zk_im_32 + Exo_model$simulation$zk_im_42 + Exo_model$simulation$zk_im_52 + Exo_model$simulation$zk_im_62 + Exo_model$simulation$zk_im_72 + Exo_model$simulation$zk_im_82  + Exo_model$simulation$zk_im_92  + Exo_model$simulation$zk_im_un_2
+
+z_2_tot_BS = z_dom_2_tot_BS + z_im_2_tot_BS
+
+zk_2_tot_BS = zk_dom_2_tot_BS + zk_im_2_tot_BS
+
+
+
+#### Industry 3
+z_dom_3_tot_BS = Exo_model$simulation$z_dom_13 + Exo_model$simulation$z_dom_23 + Exo_model$simulation$z_dom_33 + Exo_model$simulation$z_dom_43 + Exo_model$simulation$z_dom_53 + Exo_model$simulation$z_dom_63 + Exo_model$simulation$z_dom_73 + Exo_model$simulation$z_dom_83 + Exo_model$simulation$z_dom_93
+
+zk_dom_3_tot_BS = Exo_model$simulation$zk_dom_13 + Exo_model$simulation$zk_dom_23 + Exo_model$simulation$zk_dom_33 + Exo_model$simulation$zk_dom_43 + Exo_model$simulation$zk_dom_53 + Exo_model$simulation$zk_dom_63 + Exo_model$simulation$zk_dom_73 + Exo_model$simulation$zk_dom_83 + Exo_model$simulation$zk_dom_93
+
+z_im_3_tot_BS = Exo_model$simulation$z_im_13 + Exo_model$simulation$z_im_23 + Exo_model$simulation$z_im_33 + Exo_model$simulation$z_im_43 + Exo_model$simulation$z_im_53 + Exo_model$simulation$z_im_63 + Exo_model$simulation$z_im_73 + Exo_model$simulation$z_im_83 + Exo_model$simulation$z_im_93 + Exo_model$simulation$z_im_un_3
+
+zk_im_3_tot_BS = Exo_model$simulation$zk_im_13 + Exo_model$simulation$zk_im_23 + Exo_model$simulation$zk_im_33 + Exo_model$simulation$zk_im_43 + Exo_model$simulation$zk_im_53 + Exo_model$simulation$zk_im_63 + Exo_model$simulation$zk_im_73 + Exo_model$simulation$zk_im_83 + Exo_model$simulation$zk_im_93 + Exo_model$simulation$zk_im_un_3
+
+z_3_tot_BS = z_dom_3_tot_BS + z_im_3_tot_BS
+
+zk_3_tot_BS = zk_dom_3_tot_BS + zk_im_3_tot_BS
+
+
+
+#### Industry 4
+z_dom_4_tot_BS = Exo_model$simulation$z_dom_14 + Exo_model$simulation$z_dom_24 + Exo_model$simulation$z_dom_34 + Exo_model$simulation$z_dom_44 + Exo_model$simulation$z_dom_54 + Exo_model$simulation$z_dom_64 + Exo_model$simulation$z_dom_74 + Exo_model$simulation$z_dom_84 + Exo_model$simulation$z_dom_94
+
+zk_dom_4_tot_BS = Exo_model$simulation$zk_dom_14 + Exo_model$simulation$zk_dom_24 + Exo_model$simulation$zk_dom_34 + Exo_model$simulation$zk_dom_44 + Exo_model$simulation$zk_dom_54 + Exo_model$simulation$zk_dom_64 + Exo_model$simulation$zk_dom_74 + Exo_model$simulation$zk_dom_84 + Exo_model$simulation$zk_dom_94
+
+z_im_4_tot_BS = Exo_model$simulation$z_im_14 + Exo_model$simulation$z_im_24 + Exo_model$simulation$z_im_34 + Exo_model$simulation$z_im_44 + Exo_model$simulation$z_im_54 + Exo_model$simulation$z_im_64 + Exo_model$simulation$z_im_74 + Exo_model$simulation$z_im_84 + Exo_model$simulation$z_im_94 + Exo_model$simulation$z_im_un_4
+
+zk_im_4_tot_BS = Exo_model$simulation$zk_im_14 + Exo_model$simulation$zk_im_24 + Exo_model$simulation$zk_im_34 + Exo_model$simulation$zk_im_44 + Exo_model$simulation$zk_im_54 + Exo_model$simulation$zk_im_64 + Exo_model$simulation$zk_im_74 + Exo_model$simulation$zk_im_84 + Exo_model$simulation$zk_im_94 + Exo_model$simulation$zk_im_un_4
+
+z_4_tot_BS = z_dom_4_tot_BS + z_im_4_tot_BS
+
+zk_4_tot_BS = zk_dom_4_tot_BS + zk_im_4_tot_BS
+
+
+
+#### Industry 5
+z_dom_5_tot_BS = Exo_model$simulation$z_dom_15 + Exo_model$simulation$z_dom_25 + Exo_model$simulation$z_dom_35 + Exo_model$simulation$z_dom_45 + Exo_model$simulation$z_dom_55 + Exo_model$simulation$z_dom_65 + Exo_model$simulation$z_dom_75 + Exo_model$simulation$z_dom_85 + Exo_model$simulation$z_dom_95
+
+zk_dom_5_tot_BS = Exo_model$simulation$zk_dom_15 + Exo_model$simulation$zk_dom_25 + Exo_model$simulation$zk_dom_35 + Exo_model$simulation$zk_dom_45 + Exo_model$simulation$zk_dom_55 + Exo_model$simulation$zk_dom_65 + Exo_model$simulation$zk_dom_75 + Exo_model$simulation$zk_dom_85 + Exo_model$simulation$zk_dom_95
+
+z_im_5_tot_BS = Exo_model$simulation$z_im_15 + Exo_model$simulation$z_im_25 + Exo_model$simulation$z_im_35 + Exo_model$simulation$z_im_45 + Exo_model$simulation$z_im_55 + Exo_model$simulation$z_im_65 + Exo_model$simulation$z_im_75 + Exo_model$simulation$z_im_85 + Exo_model$simulation$z_im_95 + Exo_model$simulation$z_im_un_5
+
+zk_im_5_tot_BS = Exo_model$simulation$zk_im_15 + Exo_model$simulation$zk_im_25 + Exo_model$simulation$zk_im_35 + Exo_model$simulation$zk_im_45 + Exo_model$simulation$zk_im_55 + Exo_model$simulation$zk_im_65 + Exo_model$simulation$zk_im_75 + Exo_model$simulation$zk_im_85 + Exo_model$simulation$zk_im_95 + Exo_model$simulation$zk_im_un_5
+
+z_5_tot_BS = z_dom_5_tot_BS + z_im_5_tot_BS
+
+zk_5_tot_BS = zk_dom_5_tot_BS + zk_im_5_tot_BS
+
+
+
+#### Industry 6
+z_dom_6_tot_BS = Exo_model$simulation$z_dom_16 + Exo_model$simulation$z_dom_26 + Exo_model$simulation$z_dom_36 + Exo_model$simulation$z_dom_46 + Exo_model$simulation$z_dom_56 + Exo_model$simulation$z_dom_66 + Exo_model$simulation$z_dom_76 + Exo_model$simulation$z_dom_86 + Exo_model$simulation$z_dom_96
+
+zk_dom_6_tot_BS = Exo_model$simulation$zk_dom_16 + Exo_model$simulation$zk_dom_26 + Exo_model$simulation$zk_dom_36 + Exo_model$simulation$zk_dom_46 + Exo_model$simulation$zk_dom_56 + Exo_model$simulation$zk_dom_66 + Exo_model$simulation$zk_dom_76 + Exo_model$simulation$zk_dom_86 + Exo_model$simulation$zk_dom_96
+
+z_im_6_tot_BS = Exo_model$simulation$z_im_16 + Exo_model$simulation$z_im_26 + Exo_model$simulation$z_im_36 + Exo_model$simulation$z_im_46 + Exo_model$simulation$z_im_56 + Exo_model$simulation$z_im_66 + Exo_model$simulation$z_im_76 + Exo_model$simulation$z_im_86 + Exo_model$simulation$z_im_96 + Exo_model$simulation$z_im_un_6
+
+zk_im_6_tot_BS = Exo_model$simulation$zk_im_16 + Exo_model$simulation$zk_im_26 + Exo_model$simulation$zk_im_36 + Exo_model$simulation$zk_im_46 + Exo_model$simulation$zk_im_56 + Exo_model$simulation$zk_im_66 + Exo_model$simulation$zk_im_76 + Exo_model$simulation$zk_im_86 + Exo_model$simulation$zk_im_96 + Exo_model$simulation$zk_im_un_6
+
+z_6_tot_BS = z_dom_6_tot_BS + z_im_6_tot_BS
+
+zk_6_tot_BS = zk_dom_6_tot_BS + zk_im_6_tot_BS
+
+
+
+#### Industry 7
+z_dom_7_tot_BS = Exo_model$simulation$z_dom_17 + Exo_model$simulation$z_dom_27 + Exo_model$simulation$z_dom_37 + Exo_model$simulation$z_dom_47 + Exo_model$simulation$z_dom_57 + Exo_model$simulation$z_dom_67 + Exo_model$simulation$z_dom_77 + Exo_model$simulation$z_dom_87 + Exo_model$simulation$z_dom_97
+
+zk_dom_7_tot_BS = Exo_model$simulation$zk_dom_17 + Exo_model$simulation$zk_dom_27 + Exo_model$simulation$zk_dom_37 + Exo_model$simulation$zk_dom_47 + Exo_model$simulation$zk_dom_57 + Exo_model$simulation$zk_dom_67 + Exo_model$simulation$zk_dom_77 + Exo_model$simulation$zk_dom_87 + Exo_model$simulation$zk_dom_97
+
+z_im_7_tot_BS = Exo_model$simulation$z_im_17 + Exo_model$simulation$z_im_27 + Exo_model$simulation$z_im_37 + Exo_model$simulation$z_im_47 + Exo_model$simulation$z_im_57 + Exo_model$simulation$z_im_67 + Exo_model$simulation$z_im_77 + Exo_model$simulation$z_im_87 + Exo_model$simulation$z_im_97 + Exo_model$simulation$z_im_un_7
+
+zk_im_7_tot_BS = Exo_model$simulation$zk_im_17 + Exo_model$simulation$zk_im_27 + Exo_model$simulation$zk_im_37 + Exo_model$simulation$zk_im_47 + Exo_model$simulation$zk_im_57 + Exo_model$simulation$zk_im_67 + Exo_model$simulation$zk_im_77 + Exo_model$simulation$zk_im_87 + Exo_model$simulation$zk_im_97 + Exo_model$simulation$zk_im_un_7
+
+z_7_tot_BS = z_dom_7_tot_BS + z_im_7_tot_BS
+
+zk_7_tot_BS = zk_dom_7_tot_BS + zk_im_7_tot_BS
+
+
+
+#### Industry 7
+z_dom_8_tot_BS = Exo_model$simulation$z_dom_18 + Exo_model$simulation$z_dom_28 + Exo_model$simulation$z_dom_38 + Exo_model$simulation$z_dom_48 + Exo_model$simulation$z_dom_58 + Exo_model$simulation$z_dom_68 + Exo_model$simulation$z_dom_78 + Exo_model$simulation$z_dom_88 + Exo_model$simulation$z_dom_98
+
+zk_dom_8_tot_BS = Exo_model$simulation$zk_dom_18 + Exo_model$simulation$zk_dom_28 + Exo_model$simulation$zk_dom_38 + Exo_model$simulation$zk_dom_48 + Exo_model$simulation$zk_dom_58 + Exo_model$simulation$zk_dom_68 + Exo_model$simulation$zk_dom_78 + Exo_model$simulation$zk_dom_88 + Exo_model$simulation$zk_dom_98
+
+z_im_8_tot_BS = Exo_model$simulation$z_im_18 + Exo_model$simulation$z_im_28 + Exo_model$simulation$z_im_38 + Exo_model$simulation$z_im_48 + Exo_model$simulation$z_im_58 + Exo_model$simulation$z_im_68 + Exo_model$simulation$z_im_78 + Exo_model$simulation$z_im_88 + Exo_model$simulation$z_im_98 + Exo_model$simulation$z_im_un_8
+
+zk_im_8_tot_BS = Exo_model$simulation$zk_im_18 + Exo_model$simulation$zk_im_28 + Exo_model$simulation$zk_im_38 + Exo_model$simulation$zk_im_48 + Exo_model$simulation$zk_im_58 + Exo_model$simulation$zk_im_68 + Exo_model$simulation$zk_im_78 + Exo_model$simulation$zk_im_88 + Exo_model$simulation$zk_im_98 + Exo_model$simulation$zk_im_un_8
+
+z_8_tot_BS = z_dom_8_tot_BS + z_im_8_tot_BS
+
+zk_8_tot_BS = zk_dom_8_tot_BS + zk_im_8_tot_BS
+
+
+
+#### Industry 9
+z_dom_9_tot_BS = Exo_model$simulation$z_dom_19 + Exo_model$simulation$z_dom_29 + Exo_model$simulation$z_dom_39 + Exo_model$simulation$z_dom_49 + Exo_model$simulation$z_dom_59 + Exo_model$simulation$z_dom_69 + Exo_model$simulation$z_dom_79 + Exo_model$simulation$z_dom_89 + Exo_model$simulation$z_dom_99
+
+zk_dom_9_tot_BS = Exo_model$simulation$zk_dom_19 + Exo_model$simulation$zk_dom_29 + Exo_model$simulation$zk_dom_39 + Exo_model$simulation$zk_dom_49 + Exo_model$simulation$zk_dom_59 + Exo_model$simulation$zk_dom_69 + Exo_model$simulation$zk_dom_79 + Exo_model$simulation$zk_dom_89 + Exo_model$simulation$zk_dom_99
+
+z_im_9_tot_BS = Exo_model$simulation$z_im_19 + Exo_model$simulation$z_im_29 + Exo_model$simulation$z_im_39 + Exo_model$simulation$z_im_49 + Exo_model$simulation$z_im_59 + Exo_model$simulation$z_im_69 + Exo_model$simulation$z_im_79 + Exo_model$simulation$z_im_89 + Exo_model$simulation$z_im_99 + Exo_model$simulation$z_im_un_9
+
+zk_im_9_tot_BS = Exo_model$simulation$zk_im_19 + Exo_model$simulation$zk_im_29 + Exo_model$simulation$zk_im_39 + Exo_model$simulation$zk_im_49 + Exo_model$simulation$zk_im_59 + Exo_model$simulation$zk_im_69 + Exo_model$simulation$zk_im_79 + Exo_model$simulation$zk_im_89 + Exo_model$simulation$zk_im_99 + Exo_model$simulation$zk_im_un_9
+
+z_9_tot_BS = z_dom_9_tot_BS + z_im_9_tot_BS
+
+zk_9_tot_BS = zk_dom_9_tot_BS + zk_im_9_tot_BS
+
+```
+
+
+
+
+Scenario 2
+
+```{r}
+
+#### Industry 1
+z_dom_1_tot_S2 = Exo_model_S2$simulation$z_dom_11 + Exo_model_S2$simulation$z_dom_21 + Exo_model_S2$simulation$z_dom_31 + Exo_model_S2$simulation$z_dom_41 + Exo_model_S2$simulation$z_dom_51 + Exo_model_S2$simulation$z_dom_61 + Exo_model_S2$simulation$z_dom_71 + Exo_model_S2$simulation$z_dom_81 + Exo_model_S2$simulation$z_dom_91
+
+zk_dom_1_tot_S2 = Exo_model_S2$simulation$zk_dom_11 + Exo_model_S2$simulation$zk_dom_21 + Exo_model_S2$simulation$zk_dom_31 + Exo_model_S2$simulation$zk_dom_41 + Exo_model_S2$simulation$zk_dom_51 + Exo_model_S2$simulation$zk_dom_61 + Exo_model_S2$simulation$zk_dom_71 + Exo_model_S2$simulation$zk_dom_81 + Exo_model_S2$simulation$zk_dom_91
+
+z_im_1_tot_S2 = Exo_model_S2$simulation$z_im_11 + Exo_model_S2$simulation$z_im_21 + Exo_model_S2$simulation$z_im_31 + Exo_model_S2$simulation$z_im_41 + Exo_model_S2$simulation$z_im_51 + Exo_model_S2$simulation$z_im_61 + Exo_model_S2$simulation$z_im_71 + Exo_model_S2$simulation$z_im_81 + Exo_model_S2$simulation$z_im_91 + Exo_model_S2$simulation$z_im_un_1
+
+zk_im_1_tot_S2 = Exo_model_S2$simulation$zk_im_11 + Exo_model_S2$simulation$zk_im_21 + Exo_model_S2$simulation$zk_im_31 + Exo_model_S2$simulation$zk_im_41 + Exo_model_S2$simulation$zk_im_51 + Exo_model_S2$simulation$zk_im_61 + Exo_model_S2$simulation$zk_im_71 + Exo_model_S2$simulation$zk_im_81 + Exo_model_S2$simulation$zk_im_91 + Exo_model_S2$simulation$zk_im_un_1
+
+z_1_tot_S2 = z_dom_1_tot_S2 + z_im_1_tot_S2
+
+zk_1_tot_S2 = zk_dom_1_tot_S2 + zk_im_1_tot_S2
+
+
+
+#### Industry 2
+z_dom_2_tot_S2 = Exo_model_S2$simulation$z_dom_12 + Exo_model_S2$simulation$z_dom_22 + Exo_model_S2$simulation$z_dom_32 + Exo_model_S2$simulation$z_dom_42 + Exo_model_S2$simulation$z_dom_52 + Exo_model_S2$simulation$z_dom_62 + Exo_model_S2$simulation$z_dom_72 + Exo_model_S2$simulation$z_dom_82 + Exo_model_S2$simulation$z_dom_92
+
+zk_dom_2_tot_S2 = Exo_model_S2$simulation$zk_dom_12 + Exo_model_S2$simulation$zk_dom_22 + Exo_model_S2$simulation$zk_dom_32 + Exo_model_S2$simulation$zk_dom_42 + Exo_model_S2$simulation$zk_dom_52 + Exo_model_S2$simulation$zk_dom_62 + Exo_model_S2$simulation$zk_dom_72 + Exo_model_S2$simulation$zk_dom_82 + Exo_model_S2$simulation$zk_dom_92
+
+z_im_2_tot_S2 = Exo_model_S2$simulation$z_im_12 + Exo_model_S2$simulation$z_im_22 + Exo_model_S2$simulation$z_im_32 + Exo_model_S2$simulation$z_im_42 + Exo_model_S2$simulation$z_im_52 + Exo_model_S2$simulation$z_im_62 + Exo_model_S2$simulation$z_im_72 + Exo_model_S2$simulation$z_im_82 + Exo_model_S2$simulation$z_im_92 + Exo_model_S2$simulation$z_im_un_2
+
+zk_im_2_tot_S2 = Exo_model_S2$simulation$zk_im_12 + Exo_model_S2$simulation$zk_im_22 + Exo_model_S2$simulation$zk_im_32 + Exo_model_S2$simulation$zk_im_42 + Exo_model_S2$simulation$zk_im_52 + Exo_model_S2$simulation$zk_im_62 + Exo_model_S2$simulation$zk_im_72 + Exo_model_S2$simulation$zk_im_82 + Exo_model_S2$simulation$zk_im_92 + Exo_model_S2$simulation$zk_im_un_2
+
+z_2_tot_S2 = z_dom_2_tot_S2 + z_im_2_tot_S2
+
+zk_2_tot_S2 = zk_dom_2_tot_S2 + zk_im_2_tot_S2
+
+
+
+#### Industry 3
+z_dom_3_tot_S2 = Exo_model_S2$simulation$z_dom_13 + Exo_model_S2$simulation$z_dom_23 + Exo_model_S2$simulation$z_dom_33 + Exo_model_S2$simulation$z_dom_43 + Exo_model_S2$simulation$z_dom_53 + Exo_model_S2$simulation$z_dom_63 + Exo_model_S2$simulation$z_dom_73 + Exo_model_S2$simulation$z_dom_83 + Exo_model_S2$simulation$z_dom_93
+
+zk_dom_3_tot_S2 = Exo_model_S2$simulation$zk_dom_13 + Exo_model_S2$simulation$zk_dom_23 + Exo_model_S2$simulation$zk_dom_33 + Exo_model_S2$simulation$zk_dom_43 + Exo_model_S2$simulation$zk_dom_53 + Exo_model_S2$simulation$zk_dom_63 + Exo_model_S2$simulation$zk_dom_73 + Exo_model_S2$simulation$zk_dom_83 + Exo_model_S2$simulation$zk_dom_93
+
+z_im_3_tot_S2 = Exo_model_S2$simulation$z_im_13 + Exo_model_S2$simulation$z_im_23 + Exo_model_S2$simulation$z_im_33 + Exo_model_S2$simulation$z_im_43 + Exo_model_S2$simulation$z_im_53 + Exo_model_S2$simulation$z_im_63 + Exo_model_S2$simulation$z_im_73 + Exo_model_S2$simulation$z_im_83 + Exo_model_S2$simulation$z_im_93 + Exo_model_S2$simulation$z_im_un_3
+
+zk_im_3_tot_S2 = Exo_model_S2$simulation$zk_im_13 + Exo_model_S2$simulation$zk_im_23 + Exo_model_S2$simulation$zk_im_33 + Exo_model_S2$simulation$zk_im_43 + Exo_model_S2$simulation$zk_im_53 + Exo_model_S2$simulation$zk_im_63 + Exo_model_S2$simulation$zk_im_73 + Exo_model_S2$simulation$zk_im_83 + Exo_model_S2$simulation$zk_im_93 + Exo_model_S2$simulation$zk_im_un_3
+
+z_3_tot_S2 = z_dom_3_tot_S2 + z_im_3_tot_S2
+
+zk_3_tot_S2 = zk_dom_3_tot_S2 + zk_im_3_tot_S2
+
+
+
+#### Industry 4
+z_dom_4_tot_S2 = Exo_model_S2$simulation$z_dom_14 + Exo_model_S2$simulation$z_dom_24 + Exo_model_S2$simulation$z_dom_34 + Exo_model_S2$simulation$z_dom_44 + Exo_model_S2$simulation$z_dom_54 + Exo_model_S2$simulation$z_dom_64 + Exo_model_S2$simulation$z_dom_74 + Exo_model_S2$simulation$z_dom_84 + Exo_model_S2$simulation$z_dom_94
+
+zk_dom_4_tot_S2 = Exo_model_S2$simulation$zk_dom_14 + Exo_model_S2$simulation$zk_dom_24 + Exo_model_S2$simulation$zk_dom_34 + Exo_model_S2$simulation$zk_dom_44 + Exo_model_S2$simulation$zk_dom_54 + Exo_model_S2$simulation$zk_dom_64 + Exo_model_S2$simulation$zk_dom_74 + Exo_model_S2$simulation$zk_dom_84 + Exo_model_S2$simulation$zk_dom_94
+
+z_im_4_tot_S2 = Exo_model_S2$simulation$z_im_14 + Exo_model_S2$simulation$z_im_24 + Exo_model_S2$simulation$z_im_34 + Exo_model_S2$simulation$z_im_44 + Exo_model_S2$simulation$z_im_54 + Exo_model_S2$simulation$z_im_64 + Exo_model_S2$simulation$z_im_74 + Exo_model_S2$simulation$z_im_84 + Exo_model_S2$simulation$z_im_94 + Exo_model_S2$simulation$z_im_un_4
+
+zk_im_4_tot_S2 = Exo_model_S2$simulation$zk_im_14 + Exo_model_S2$simulation$zk_im_24 + Exo_model_S2$simulation$zk_im_34 + Exo_model_S2$simulation$zk_im_44 + Exo_model_S2$simulation$zk_im_54 + Exo_model_S2$simulation$zk_im_64 + Exo_model_S2$simulation$zk_im_74 + Exo_model_S2$simulation$zk_im_84 + Exo_model_S2$simulation$zk_im_94 + Exo_model_S2$simulation$zk_im_un_4
+
+z_4_tot_S2 = z_dom_4_tot_S2 + z_im_4_tot_S2
+
+zk_4_tot_S2 = zk_dom_4_tot_S2 + zk_im_4_tot_S2
+
+
+
+#### Industry 5
+z_dom_5_tot_S2 = Exo_model_S2$simulation$z_dom_15 + Exo_model_S2$simulation$z_dom_25 + Exo_model_S2$simulation$z_dom_35 + Exo_model_S2$simulation$z_dom_45 + Exo_model_S2$simulation$z_dom_55 + Exo_model_S2$simulation$z_dom_65 + Exo_model_S2$simulation$z_dom_75 + Exo_model_S2$simulation$z_dom_85 + Exo_model_S2$simulation$z_dom_95
+
+zk_dom_5_tot_S2 = Exo_model_S2$simulation$zk_dom_15 + Exo_model_S2$simulation$zk_dom_25 + Exo_model_S2$simulation$zk_dom_35 + Exo_model_S2$simulation$zk_dom_45 + Exo_model_S2$simulation$zk_dom_55 + Exo_model_S2$simulation$zk_dom_65 + Exo_model_S2$simulation$zk_dom_75 + Exo_model_S2$simulation$zk_dom_85 + Exo_model_S2$simulation$zk_dom_95
+
+z_im_5_tot_S2 = Exo_model_S2$simulation$z_im_15 + Exo_model_S2$simulation$z_im_25 + Exo_model_S2$simulation$z_im_35 + Exo_model_S2$simulation$z_im_45 + Exo_model_S2$simulation$z_im_55 + Exo_model_S2$simulation$z_im_65 + Exo_model_S2$simulation$z_im_75 + Exo_model_S2$simulation$z_im_85 + Exo_model_S2$simulation$z_im_95 + Exo_model_S2$simulation$z_im_un_5
+
+zk_im_5_tot_S2 = Exo_model_S2$simulation$zk_im_15 + Exo_model_S2$simulation$zk_im_25 + Exo_model_S2$simulation$zk_im_35 + Exo_model_S2$simulation$zk_im_45 + Exo_model_S2$simulation$zk_im_55 + Exo_model_S2$simulation$zk_im_65 + Exo_model_S2$simulation$zk_im_75 + Exo_model_S2$simulation$zk_im_85 + Exo_model_S2$simulation$zk_im_95 + Exo_model_S2$simulation$zk_im_un_5
+
+z_5_tot_S2 = z_dom_5_tot_S2 + z_im_5_tot_S2
+
+zk_5_tot_S2 = zk_dom_5_tot_S2 + zk_im_5_tot_S2
+
+
+
+#### Industry 6
+z_dom_6_tot_S2 = Exo_model_S2$simulation$z_dom_16 + Exo_model_S2$simulation$z_dom_26 + Exo_model_S2$simulation$z_dom_36 + Exo_model_S2$simulation$z_dom_46 + Exo_model_S2$simulation$z_dom_56 + Exo_model_S2$simulation$z_dom_66 + Exo_model_S2$simulation$z_dom_76 + Exo_model_S2$simulation$z_dom_86 + Exo_model_S2$simulation$z_dom_96
+
+zk_dom_6_tot_S2 = Exo_model_S2$simulation$zk_dom_16 + Exo_model_S2$simulation$zk_dom_26 + Exo_model_S2$simulation$zk_dom_36 + Exo_model_S2$simulation$zk_dom_46 + Exo_model_S2$simulation$zk_dom_56 + Exo_model_S2$simulation$zk_dom_66 + Exo_model_S2$simulation$zk_dom_76 + Exo_model_S2$simulation$zk_dom_86 + Exo_model_S2$simulation$zk_dom_96
+
+z_im_6_tot_S2 = Exo_model_S2$simulation$z_im_16 + Exo_model_S2$simulation$z_im_26 + Exo_model_S2$simulation$z_im_36 + Exo_model_S2$simulation$z_im_46 + Exo_model_S2$simulation$z_im_56 + Exo_model_S2$simulation$z_im_66 + Exo_model_S2$simulation$z_im_76 + Exo_model_S2$simulation$z_im_86 + Exo_model_S2$simulation$z_im_96 + Exo_model_S2$simulation$z_im_un_6
+
+zk_im_6_tot_S2 = Exo_model_S2$simulation$zk_im_16 + Exo_model_S2$simulation$zk_im_26 + Exo_model_S2$simulation$zk_im_36 + Exo_model_S2$simulation$zk_im_46 + Exo_model_S2$simulation$zk_im_56 + Exo_model_S2$simulation$zk_im_66 + Exo_model_S2$simulation$zk_im_76 + Exo_model_S2$simulation$zk_im_86 + Exo_model_S2$simulation$zk_im_96 + Exo_model_S2$simulation$zk_im_un_6
+
+z_6_tot_S2 = z_dom_6_tot_S2 + z_im_6_tot_S2
+
+zk_6_tot_S2 = zk_dom_6_tot_S2 + zk_im_6_tot_S2
+
+
+
+#### Industry 7
+z_dom_7_tot_S2 = Exo_model_S2$simulation$z_dom_17 + Exo_model_S2$simulation$z_dom_27 + Exo_model_S2$simulation$z_dom_37 + Exo_model_S2$simulation$z_dom_47 + Exo_model_S2$simulation$z_dom_57 + Exo_model_S2$simulation$z_dom_67 + Exo_model_S2$simulation$z_dom_77 + Exo_model_S2$simulation$z_dom_87 + Exo_model_S2$simulation$z_dom_97
+
+zk_dom_7_tot_S2 = Exo_model_S2$simulation$zk_dom_17 + Exo_model_S2$simulation$zk_dom_27 + Exo_model_S2$simulation$zk_dom_37 + Exo_model_S2$simulation$zk_dom_47 + Exo_model_S2$simulation$zk_dom_57 + Exo_model_S2$simulation$zk_dom_67 + Exo_model_S2$simulation$zk_dom_77 + Exo_model_S2$simulation$zk_dom_87 + Exo_model_S2$simulation$zk_dom_97
+
+z_im_7_tot_S2 = Exo_model_S2$simulation$z_im_17 + Exo_model_S2$simulation$z_im_27 + Exo_model_S2$simulation$z_im_37 + Exo_model_S2$simulation$z_im_47 + Exo_model_S2$simulation$z_im_57 + Exo_model_S2$simulation$z_im_67 + Exo_model_S2$simulation$z_im_77 + Exo_model_S2$simulation$z_im_87 + Exo_model_S2$simulation$z_im_97 + Exo_model_S2$simulation$z_im_un_7
+
+zk_im_7_tot_S2 = Exo_model_S2$simulation$zk_im_17 + Exo_model_S2$simulation$zk_im_27 + Exo_model_S2$simulation$zk_im_37 + Exo_model_S2$simulation$zk_im_47 + Exo_model_S2$simulation$zk_im_57 + Exo_model_S2$simulation$zk_im_67 + Exo_model_S2$simulation$zk_im_77 + Exo_model_S2$simulation$zk_im_87 + Exo_model_S2$simulation$zk_im_97 + Exo_model_S2$simulation$zk_im_un_7
+
+z_7_tot_S2 = z_dom_7_tot_S2 + z_im_7_tot_S2
+
+zk_7_tot_S2 = zk_dom_7_tot_S2 + zk_im_7_tot_S2
+
+
+#### Industry 8
+z_dom_8_tot_S2 = Exo_model_S2$simulation$z_dom_18 + Exo_model_S2$simulation$z_dom_28 + Exo_model_S2$simulation$z_dom_38 + Exo_model_S2$simulation$z_dom_48 + Exo_model_S2$simulation$z_dom_58 + Exo_model_S2$simulation$z_dom_68 + Exo_model_S2$simulation$z_dom_78 + Exo_model_S2$simulation$z_dom_88 + Exo_model_S2$simulation$z_dom_98
+
+zk_dom_8_tot_S2 = Exo_model_S2$simulation$zk_dom_18 + Exo_model_S2$simulation$zk_dom_28 + Exo_model_S2$simulation$zk_dom_38 + Exo_model_S2$simulation$zk_dom_48 + Exo_model_S2$simulation$zk_dom_58 + Exo_model_S2$simulation$zk_dom_68 + Exo_model_S2$simulation$zk_dom_78 + Exo_model_S2$simulation$zk_dom_88 + Exo_model_S2$simulation$zk_dom_98
+
+z_im_8_tot_S2 = Exo_model_S2$simulation$z_im_18 + Exo_model_S2$simulation$z_im_28 + Exo_model_S2$simulation$z_im_38 + Exo_model_S2$simulation$z_im_48 + Exo_model_S2$simulation$z_im_58 + Exo_model_S2$simulation$z_im_68 + Exo_model_S2$simulation$z_im_78 + Exo_model_S2$simulation$z_im_88 + Exo_model_S2$simulation$z_im_98 + Exo_model_S2$simulation$z_im_un_8
+
+zk_im_8_tot_S2 = Exo_model_S2$simulation$zk_im_18 + Exo_model_S2$simulation$zk_im_28 + Exo_model_S2$simulation$zk_im_38 + Exo_model_S2$simulation$zk_im_48 + Exo_model_S2$simulation$zk_im_58 + Exo_model_S2$simulation$zk_im_68 + Exo_model_S2$simulation$zk_im_78 + Exo_model_S2$simulation$zk_im_88 + Exo_model_S2$simulation$zk_im_98 + Exo_model_S2$simulation$zk_im_un_8
+
+z_8_tot_S2 = z_dom_8_tot_S2 + z_im_8_tot_S2
+
+zk_8_tot_S2 = zk_dom_8_tot_S2 + zk_im_8_tot_S2
+
+
+
+#### Industry 9
+z_dom_9_tot_S2 = Exo_model_S2$simulation$z_dom_19 + Exo_model_S2$simulation$z_dom_29 + Exo_model_S2$simulation$z_dom_39 + Exo_model_S2$simulation$z_dom_49 + Exo_model_S2$simulation$z_dom_59 + Exo_model_S2$simulation$z_dom_69 + Exo_model_S2$simulation$z_dom_79 + Exo_model_S2$simulation$z_dom_89 + Exo_model_S2$simulation$z_dom_99
+
+zk_dom_9_tot_S2 = Exo_model_S2$simulation$zk_dom_19 + Exo_model_S2$simulation$zk_dom_29 + Exo_model_S2$simulation$zk_dom_39 + Exo_model_S2$simulation$zk_dom_49 + Exo_model_S2$simulation$zk_dom_59 + Exo_model_S2$simulation$zk_dom_69 + Exo_model_S2$simulation$zk_dom_79 + Exo_model_S2$simulation$zk_dom_89 + Exo_model_S2$simulation$zk_dom_99
+
+z_im_9_tot_S2 = Exo_model_S2$simulation$z_im_19 + Exo_model_S2$simulation$z_im_29 + Exo_model_S2$simulation$z_im_39 + Exo_model_S2$simulation$z_im_49 + Exo_model_S2$simulation$z_im_59 + Exo_model_S2$simulation$z_im_69 + Exo_model_S2$simulation$z_im_79 + Exo_model_S2$simulation$z_im_89 + Exo_model_S2$simulation$z_im_99 + Exo_model_S2$simulation$z_im_un_9
+
+zk_im_9_tot_S2 = Exo_model_S2$simulation$zk_im_19 + Exo_model_S2$simulation$zk_im_29 + Exo_model_S2$simulation$zk_im_39 + Exo_model_S2$simulation$zk_im_49 + Exo_model_S2$simulation$zk_im_59 + Exo_model_S2$simulation$zk_im_69 + Exo_model_S2$simulation$zk_im_79 + Exo_model_S2$simulation$zk_im_89 + Exo_model_S2$simulation$zk_im_99 + Exo_model_S2$simulation$zk_im_un_9
+
+z_9_tot_S2 = z_dom_9_tot_S2 + z_im_9_tot_S2
+
+zk_9_tot_S2 = zk_dom_9_tot_S2 + zk_im_9_tot_S2
+
+
+```
+
+
+
+
+```{r, fig.width=15, fig.height=10}
+
+par(mfrow = c(2, 2), oma = c(0, 0, 3, 0))  # oma sets the outer margins
+
+
+theme_journal()
+
+
+
+
+
+plot((Exo_model_S2$simulation$exk_dom_1 - Exo_model$simulation$exk_dom_1)/Exo_model$simulation$exk_dom_1*100, ylim=c(-50,2),col= "red", ylab= "Percentage change" , main= "Change in Real Exports", lwd=3, xlab="", cex.main=1.5);
+lines((Exo_model_S2$simulation$exk_dom_2 - Exo_model$simulation$exk_dom_2)/Exo_model$simulation$exk_dom_2*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S2$simulation$exk_dom_3 - Exo_model$simulation$exk_dom_3)/Exo_model$simulation$exk_dom_3*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$exk_dom_4 - Exo_model$simulation$exk_dom_4)/Exo_model$simulation$exk_dom_4*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$exk_dom_5 - Exo_model$simulation$exk_dom_5)/Exo_model$simulation$exk_dom_5*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$exk_dom_6 - Exo_model$simulation$exk_dom_6)/Exo_model$simulation$exk_dom_6*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$exk_dom_7 - Exo_model$simulation$exk_dom_7)/Exo_model$simulation$exk_dom_7*100, col = "pink", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$exk_dom_8 - Exo_model$simulation$exk_dom_8)/Exo_model$simulation$exk_dom_8*100, col = "darkgreen", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$exk_dom_9 - Exo_model$simulation$exk_dom_9)/Exo_model$simulation$exk_dom_9*100, col = "darkblue", lwd=3, xlab="");
+legend("bottomleft",legend=c("Industry 1 (Agriculture)", "Industry 2 (Forresty)","Industry 3 (Fishery)","Industry 4 (Mining)","Industry 5 (Manu. food)","Industry 6 (Energy prod.)","Industry 7 (Energy inten.)","Industry 8 (Financial corp.)","Industry 9 (other industries)"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink", "darkgreen", "darkblue")); grid()
+
+
+
+
+plot((Exo_model_S2$simulation$phi_c_oth - Exo_model$simulation$phi_c_oth)*100, col= "red", ylab= "Level change from baseline" , main= "Import shares of final consumption", lwd=3, ylim= c(-0,2), cex.main=1.5);
+lines((Exo_model_S2$simulation$phi_c_110 - Exo_model$simulation$phi_c_110)*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S2$simulation$phi_c_120 - Exo_model$simulation$phi_c_120)*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$phi_c_130 - Exo_model$simulation$phi_c_130)*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$phi_c_140 - Exo_model$simulation$phi_c_140)*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$phi_c_160 - Exo_model$simulation$phi_c_160)*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$phi_c_180 - Exo_model$simulation$phi_c_180)*100, col = "pink", lwd=3, xlab="");
+legend("topleft",legend=c("Other consumption", "Bread consumption","Meat consumption","Fish consumption","Diary consumption","Fruit and vegetable consumption","Other food consumption"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink")); grid()
+
+
+
+
+plot(zk_im_1_tot_S2/zk_1_tot_S2*100 - zk_im_1_tot_BS/zk_1_tot_BS*100, col= "red", ylab= "Percentage change from baseline" , main= "Import shares on inputs", lwd=3, ylim= c(-0.2,2), cex.main=1.5);
+lines(zk_im_2_tot_S2/zk_2_tot_S2*100 - zk_im_2_tot_BS/zk_2_tot_BS*100, col = "blue", lwd=3, xlab=""); 
+lines(zk_im_3_tot_S2/zk_3_tot_S2*100 - zk_im_3_tot_BS/zk_3_tot_BS*100, col = "green", lwd=3, xlab="");
+lines(zk_im_4_tot_S2/zk_4_tot_S2*100 - zk_im_4_tot_BS/zk_4_tot_BS*100, col = "black", lwd=3, xlab="");
+lines(zk_im_5_tot_S2/zk_5_tot_S2*100 - zk_im_5_tot_BS/zk_5_tot_BS*100, col = "orange", lwd=3, xlab="");
+lines(zk_im_6_tot_S2/zk_6_tot_S2*100 - zk_im_6_tot_BS/zk_6_tot_BS*100, col = "yellow", lwd=3, xlab="");
+lines(zk_im_7_tot_S2/zk_7_tot_S2*100 - zk_im_7_tot_BS/zk_7_tot_BS*100, col = "pink", lwd=3, xlab="");
+lines(zk_im_8_tot_S2/zk_8_tot_S2*100 - zk_im_8_tot_BS/zk_8_tot_BS*100, col = "darkgreen", lwd=3, xlab="");
+lines(zk_im_9_tot_S2/zk_9_tot_S2*100 - zk_im_9_tot_BS/zk_9_tot_BS*100, col = "darkblue", lwd=3, xlab="");
+legend("topleft",legend=c("Industry 1 (Agriculture)", "Industry 2 (Forresty)","Industry 3 (Fishery)","Industry 4 (Mining)","Industry 5 (Manu. food)","Industry 6 (Energy prod.)","Industry 7 (Energy inten.)","Industry 8 (Financial corp.)","Industry 9 (other industries)"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink", "darkgreen", "darkblue")); grid()
+
+
+plot((Exo_model_S2$simulation$nxk - Exo_model$simulation$nxk), col= "red", ylab= "Change from baseline (B. DKR)" , main= "Real net-export" , xlim= c(1998,2020), lwd=3, xlab="", cex.main=1.5);grid()
+
+
+# Adding a collective title for both plots
+mtext("Effect on international trade", side = 3, outer = TRUE, line = 1, cex = 1.5)
+
+```
+
+
+
+
+
+Her finder de en reduktion på 750.000 tons co2e https://dreamgruppen.dk/media/9770/effekter_af_to_stod_til_landbruget.pdf
+
+```{r, fig.height=6, fig.width=15}
+
+par(mfrow=c(1,2))
+
+plot((Exo_model_S2$simulation$Co2E_1 - Exo_model$simulation$Co2E_1)/Exo_model$simulation$Co2E_1*100, col= "red", ylab= "Percentage change from baseline" , main= "Total Co2-Equivelant emission", lwd=3, ylim= c(-25,1));
+lines((Exo_model_S2$simulation$Co2E_2 - Exo_model$simulation$Co2E_2)/Exo_model$simulation$Co2E_2*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S2$simulation$Co2E_3 - Exo_model$simulation$Co2E_3)/Exo_model$simulation$Co2E_3*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$Co2E_4 - Exo_model$simulation$Co2E_4)/Exo_model$simulation$Co2E_4*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$Co2E_5 - Exo_model$simulation$Co2E_5)/Exo_model$simulation$Co2E_5*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$Co2E_6 - Exo_model$simulation$Co2E_6)/Exo_model$simulation$Co2E_6*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$Co2E_7 - Exo_model$simulation$Co2E_7)/Exo_model$simulation$Co2E_7*100, col = "pink", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$Co2E_8 - Exo_model$simulation$Co2E_8)/Exo_model$simulation$Co2E_8*100, col = "darkgreen", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$Co2E_9 - Exo_model$simulation$Co2E_9)/Exo_model$simulation$Co2E_9*100, col = "darkblue", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$Co2E_HH - Exo_model$simulation$Co2E_HH)/Exo_model$simulation$Co2E_HH*100, col = "darkred", lwd=3, xlab="");
+legend("bottomleft",legend=c("Industry 1 (Agriculture)", "Industry 2 (Forresty)","Industry 3 (Fishery)","Industry 4 (Mining)","Industry 5 (Manu. food)","Industry 6 (Energy prod.)","Industry 7 (Energy inten.)","Industry 8 (Financial corp.)","Industry 9 (other industries)", "HH"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink", "darkgreen", "darkblue","darkred")); grid()
+
+
+
+plot((Exo_model_S2$simulation$Co2E_tot - Exo_model$simulation$Co2E_tot)/Exo_model$simulation$Co2E_tot*100, col= "red", ylab= "Percentage change from baseline" , main= "Total Co2-Equivelant emission", lwd=3); 
+legend("bottomleft",legend=c("Carbon tax in agriculture", "Baseline model"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=1); grid()
+
+
+```
+
+
+```{r, fig.height=10, fig.width=15}
+par(mfrow = c(2, 2), oma = c(0, 0, 3, 0))  # oma sets the outer margins
+
+
+theme_journal()
+
+
+plot((Exo_model_S2$simulation$fnw_nfck - Exo_model$simulation$fnw_nfck), col= "red", ylab= "Change from baseline (B. DKR)" , main= "Real financial net wealth: NFC" , xlim= c(1998,2020), lwd=3, xlab="", cex.main=1.5);grid()
+
+plot((Exo_model_S2$simulation$fnw_hk - Exo_model$simulation$fnw_hk), col= "red", ylab= "Change from baseline (B. DKR)" , main= "Real financial net wealth: HH" , xlim= c(1998,2020), lwd=3, xlab="", cex.main=1.5);grid()
+
+plot((Exo_model_S2$simulation$fnw_gk - Exo_model$simulation$fnw_gk), col= "red", ylab= "Change from baseline (B. DKR)" , main= "Real financial net wealth: GOV" , xlim= c(1998,2020), lwd=3, xlab="", cex.main=1.5);grid()
+
+plot((Exo_model_S2$simulation$fnw_rowk - Exo_model$simulation$fnw_rowk), col= "red", ylab= "Change from baseline (B. DKR)" , main= "Real financial net wealth: ROW" , xlim= c(1998,2020), lwd=3, xlab="", cex.main=1.5);grid()
+
+
+# Adding a collective title for both plots
+mtext("Effect on real financial net wealth", side = 3, outer = TRUE, line = 1, cex = 1.5)
+```
+
+
+
+# Scenario 3 Interest rate shock
+
+
+
+```{r}
+
+Scenario_3_shock= S_modelData$Scenario_3 %>% window(start= c(2010,1))
+```
+
+
+
+```{r}
+# Define add-factor list (defining shock)
+constantAdjList_s3 <- list(
+  
+Scenario_3 = TIMESERIES(Scenario_3_shock+1 ,START=c(2010,1),  FREQ=1)
+)
+
+```
+
+```{r, results='hide'}
+# Simulate the model (following shock)
+Exo_model_S3 <- SIMULATE(S_model
+                    ,simType='dynamic'
+                    ,TSRANGE=c(1998,1,2019,1)
+                    ,simConvergence=0.00001
+                    ,simIterLimit=100
+                    ,ConstantAdjustment=constantAdjList_s3
+                    )
+```
+
+
+```{r}
+Exo_model_S3$simulation$check_nl 
+Exo_model_S3$simulation$check_sec
+Exo_model_S3$simulation$check_np
+Exo_model_S3$simulation$check_ctr
+Exo_model_S3$simulation$check_invest
+Exo_model_S3$simulation$check_tax
+```
+
+
+
+## Plots
+
+
+
+```{r, fig.width=20, fig.height=10}
+
+par(mfrow=c(2,3), oma = c(0, 0, 3, 0))  # oma sets the outer margins
+
+# Apply the theme
+theme_journal()
+
+plot((Exo_model_S3$simulation$yk - Exo_model$simulation$yk)/Exo_model$simulation$yk*100, col= "red", ylab= "Percentage change from Baseline" , main= "Real GDP" , xlim= c(c(1998,2020)), lwd=3, xlab="", cex.main=1.8);grid()
+
+plot((Exo_model_S3$simulation$pconk - Exo_model$simulation$pconk)/Exo_model$simulation$pconk*100, col= "red", ylab= "Percentage change from Baseline" , main= "Real Consumption" , xlim= c(c(1998,2020)), lwd=3, xlab="", cex.main=1.8);grid()
+
+plot((Exo_model_S3$simulation$ik - Exo_model$simulation$ik)/Exo_model$simulation$ik*100, col= "red", ylab= "Percentage change from Baseline" , main= "Real Investment" , xlim= c(c(1998,2020)), lwd=3, xlab="", cex.main=1.8);grid()
+
+plot((Exo_model_S3$simulation$xk - Exo_model$simulation$xk)/Exo_model$simulation$xk*100, col= "red", ylab= "Percentage change from Baseline" , main= "Real exports" , ylim=c(-1,0),xlim= c(c(1998,2020)), lwd=3, xlab="", cex.main=1.8);grid()
+
+plot((Exo_model_S3$simulation$imk - Exo_model$simulation$imk)/Exo_model$simulation$imk*100, col= "red", ylab= "Percentage change from Baseline" , main= "Real imports" , xlim= c(c(1998,2020)), lwd=3, xlab="", cex.main=1.8);grid()
+
+plot((Exo_model_S3$simulation$emp_tot - Exo_model$simulation$emp_tot)/Exo_model$simulation$emp_tot*100, col= "red", ylab= "Percentage change from Baseline" , main= "Employment" , xlim= c(c(1998,2020)), lwd=3, xlab="", cex.main=1.8);grid()
+
+
+# Adding a collective title for both plots
+mtext("GDP components", side = 3, outer = TRUE, line = 1, cex = 1.7)
+
+```
+
+
+
+We calculate total intermediate consumption for each industry
+
+```{r}
+
+### BASELINE
+zk_dom_1_sales_BS = Exo_model$simulation$zk_dom_11 + Exo_model$simulation$zk_dom_12 + Exo_model$simulation$zk_dom_13 + Exo_model$simulation$zk_dom_14 + Exo_model$simulation$zk_dom_15 + Exo_model$simulation$zk_dom_16 + Exo_model$simulation$zk_dom_17 + Exo_model$simulation$zk_dom_18 + Exo_model$simulation$zk_dom_19 
+
+
+zk_dom_2_sales_BS = Exo_model$simulation$zk_dom_21 + Exo_model$simulation$zk_dom_22 + Exo_model$simulation$zk_dom_23 + Exo_model$simulation$zk_dom_24 + Exo_model$simulation$zk_dom_25 + Exo_model$simulation$zk_dom_26 + Exo_model$simulation$zk_dom_27 + Exo_model$simulation$zk_dom_28 + Exo_model$simulation$zk_dom_29 
+
+
+zk_dom_3_sales_BS = Exo_model$simulation$zk_dom_31 + Exo_model$simulation$zk_dom_32 + Exo_model$simulation$zk_dom_33 + Exo_model$simulation$zk_dom_34 + Exo_model$simulation$zk_dom_35 + Exo_model$simulation$zk_dom_36 + Exo_model$simulation$zk_dom_37 + Exo_model$simulation$zk_dom_38 + Exo_model$simulation$zk_dom_39 
+
+
+zk_dom_4_sales_BS = Exo_model$simulation$zk_dom_41 + Exo_model$simulation$zk_dom_42 + Exo_model$simulation$zk_dom_43 + Exo_model$simulation$zk_dom_44 + Exo_model$simulation$zk_dom_45 + Exo_model$simulation$zk_dom_46 + Exo_model$simulation$zk_dom_47 + Exo_model$simulation$zk_dom_48 + Exo_model$simulation$zk_dom_49 
+
+
+zk_dom_5_sales_BS = Exo_model$simulation$zk_dom_51 + Exo_model$simulation$zk_dom_52 + Exo_model$simulation$zk_dom_53 + Exo_model$simulation$zk_dom_54 + Exo_model$simulation$zk_dom_55 + Exo_model$simulation$zk_dom_56 + Exo_model$simulation$zk_dom_57 + Exo_model$simulation$zk_dom_58 + Exo_model$simulation$zk_dom_59 
+
+
+zk_dom_6_sales_BS = Exo_model$simulation$zk_dom_61 + Exo_model$simulation$zk_dom_62 + Exo_model$simulation$zk_dom_63 + Exo_model$simulation$zk_dom_64 + Exo_model$simulation$zk_dom_65 + Exo_model$simulation$zk_dom_66 + Exo_model$simulation$zk_dom_67 + Exo_model$simulation$zk_dom_68 + Exo_model$simulation$zk_dom_69 
+
+
+zk_dom_7_sales_BS = Exo_model$simulation$zk_dom_71 + Exo_model$simulation$zk_dom_72 + Exo_model$simulation$zk_dom_73 + Exo_model$simulation$zk_dom_74 + Exo_model$simulation$zk_dom_75 + Exo_model$simulation$zk_dom_76 + Exo_model$simulation$zk_dom_77 + Exo_model$simulation$zk_dom_78 + Exo_model$simulation$zk_dom_79 
+
+
+zk_dom_8_sales_BS = Exo_model$simulation$zk_dom_81 + Exo_model$simulation$zk_dom_82 + Exo_model$simulation$zk_dom_83 + Exo_model$simulation$zk_dom_84 + Exo_model$simulation$zk_dom_85 + Exo_model$simulation$zk_dom_86 + Exo_model$simulation$zk_dom_87 + Exo_model$simulation$zk_dom_88 + Exo_model$simulation$zk_dom_89 
+
+
+zk_dom_9_sales_BS = Exo_model$simulation$zk_dom_91 + Exo_model$simulation$zk_dom_92 + Exo_model$simulation$zk_dom_93 + Exo_model$simulation$zk_dom_94 + Exo_model$simulation$zk_dom_95 + Exo_model$simulation$zk_dom_96 + Exo_model$simulation$zk_dom_97 + Exo_model$simulation$zk_dom_98 + Exo_model$simulation$zk_dom_99 
+```
+
+
+
+```{r}
+
+#### SCENARIO 3
+zk_dom_1_sales_S3 = Exo_model_S3$simulation$zk_dom_11 + Exo_model_S3$simulation$zk_dom_12 + Exo_model_S3$simulation$zk_dom_13 + Exo_model_S3$simulation$zk_dom_14 + Exo_model_S3$simulation$zk_dom_15 + Exo_model_S3$simulation$zk_dom_16 + Exo_model_S3$simulation$zk_dom_17 + Exo_model_S3$simulation$zk_dom_18 + Exo_model_S3$simulation$zk_dom_19 
+
+
+zk_dom_2_sales_S3 = Exo_model_S3$simulation$zk_dom_21 + Exo_model_S3$simulation$zk_dom_22 + Exo_model_S3$simulation$zk_dom_23 + Exo_model_S3$simulation$zk_dom_24 + Exo_model_S3$simulation$zk_dom_25 + Exo_model_S3$simulation$zk_dom_26 + Exo_model_S3$simulation$zk_dom_27 + Exo_model_S3$simulation$zk_dom_28 + Exo_model_S3$simulation$zk_dom_29 
+
+
+zk_dom_3_sales_S3 = Exo_model_S3$simulation$zk_dom_31 + Exo_model_S3$simulation$zk_dom_32 + Exo_model_S3$simulation$zk_dom_33 + Exo_model_S3$simulation$zk_dom_34 + Exo_model_S3$simulation$zk_dom_35 + Exo_model_S3$simulation$zk_dom_36 + Exo_model_S3$simulation$zk_dom_37 + Exo_model_S3$simulation$zk_dom_38 + Exo_model_S3$simulation$zk_dom_39 
+
+
+zk_dom_4_sales_S3 = Exo_model_S3$simulation$zk_dom_41 + Exo_model_S3$simulation$zk_dom_42 + Exo_model_S3$simulation$zk_dom_43 + Exo_model_S3$simulation$zk_dom_44 + Exo_model_S3$simulation$zk_dom_45 + Exo_model_S3$simulation$zk_dom_46 + Exo_model_S3$simulation$zk_dom_47 + Exo_model_S3$simulation$zk_dom_48 + Exo_model_S3$simulation$zk_dom_49 
+
+
+zk_dom_5_sales_S3 = Exo_model_S3$simulation$zk_dom_51 + Exo_model_S3$simulation$zk_dom_52 + Exo_model_S3$simulation$zk_dom_53 + Exo_model_S3$simulation$zk_dom_54 + Exo_model_S3$simulation$zk_dom_55 + Exo_model_S3$simulation$zk_dom_56 + Exo_model_S3$simulation$zk_dom_57 + Exo_model_S3$simulation$zk_dom_58 + Exo_model_S3$simulation$zk_dom_59 
+
+
+zk_dom_6_sales_S3 = Exo_model_S3$simulation$zk_dom_61 + Exo_model_S3$simulation$zk_dom_62 + Exo_model_S3$simulation$zk_dom_63 + Exo_model_S3$simulation$zk_dom_64 + Exo_model_S3$simulation$zk_dom_65 + Exo_model_S3$simulation$zk_dom_66 + Exo_model_S3$simulation$zk_dom_67 + Exo_model_S3$simulation$zk_dom_68 + Exo_model_S3$simulation$zk_dom_69 
+
+
+zk_dom_7_sales_S3 = Exo_model_S3$simulation$zk_dom_71 + Exo_model_S3$simulation$zk_dom_72 + Exo_model_S3$simulation$zk_dom_73 + Exo_model_S3$simulation$zk_dom_74 + Exo_model_S3$simulation$zk_dom_75 + Exo_model_S3$simulation$zk_dom_76 + Exo_model_S3$simulation$zk_dom_77 + Exo_model_S3$simulation$zk_dom_78 + Exo_model_S3$simulation$zk_dom_79 
+
+
+zk_dom_8_sales_S3 = Exo_model_S3$simulation$zk_dom_81 + Exo_model_S3$simulation$zk_dom_82 + Exo_model_S3$simulation$zk_dom_83 + Exo_model_S3$simulation$zk_dom_84 + Exo_model_S3$simulation$zk_dom_85 + Exo_model_S3$simulation$zk_dom_86 + Exo_model_S3$simulation$zk_dom_87 + Exo_model_S3$simulation$zk_dom_88 + Exo_model_S3$simulation$zk_dom_89 
+
+
+zk_dom_9_sales_S3 = Exo_model_S3$simulation$zk_dom_91 + Exo_model_S3$simulation$zk_dom_92 + Exo_model_S3$simulation$zk_dom_93 + Exo_model_S3$simulation$zk_dom_94 + Exo_model_S3$simulation$zk_dom_95 + Exo_model_S3$simulation$zk_dom_96 + Exo_model_S3$simulation$zk_dom_97 + Exo_model_S3$simulation$zk_dom_98 + Exo_model_S3$simulation$zk_dom_99 
+```
+
+
+
+
+```{r, fig.height=10, fig.width=15}
+
+# Setting up a 1x2 layout for the plots
+par(mfrow = c(2, 2), oma = c(0, 0, 3, 0))  # oma sets the outer margins
+
+# First plot
+plot((Exo_model_S3$simulation$Xk_dom_1 - Exo_model$simulation$Xk_dom_1)/Exo_model$simulation$Xk_dom_1*100,
+     col = "red", ylab = "% change from baseline", main = "Total sales", lwd = 3, ylim = c(-2, 2.5))
+lines((Exo_model_S3$simulation$Xk_dom_2 - Exo_model$simulation$Xk_dom_2)/Exo_model$simulation$Xk_dom_2*100, col = "blue", lwd = 3)
+lines((Exo_model_S3$simulation$Xk_dom_3 - Exo_model$simulation$Xk_dom_3)/Exo_model$simulation$Xk_dom_3*100, col = "green", lwd = 3)
+lines((Exo_model_S3$simulation$Xk_dom_4 - Exo_model$simulation$Xk_dom_4)/Exo_model$simulation$Xk_dom_4*100, col = "black", lwd = 3)
+lines((Exo_model_S3$simulation$Xk_dom_5 - Exo_model$simulation$Xk_dom_5)/Exo_model$simulation$Xk_dom_5*100, col = "orange", lwd = 3)
+lines((Exo_model_S3$simulation$Xk_dom_6 - Exo_model$simulation$Xk_dom_6)/Exo_model$simulation$Xk_dom_6*100, col = "yellow", lwd = 3)
+lines((Exo_model_S3$simulation$Xk_dom_7 - Exo_model$simulation$Xk_dom_7)/Exo_model$simulation$Xk_dom_7*100, col = "pink", lwd = 3)
+lines((Exo_model_S3$simulation$Xk_dom_8 - Exo_model$simulation$Xk_dom_8)/Exo_model$simulation$Xk_dom_8*100, col = "darkgreen", lwd = 3)
+lines((Exo_model_S3$simulation$Xk_dom_9 - Exo_model$simulation$Xk_dom_9)/Exo_model$simulation$Xk_dom_9*100, col = "darkblue", lwd = 3)
+legend("topleft", legend = c("Industry 1 (Agriculture)", "Industry 2 (Forestry)", "Industry 3 (Fishery)",
+                             "Industry 4 (Mining)", "Industry 5 (Manu. food)", "Industry 6 (Energy prod.)",
+                             "Industry 7 (Energy inten.)", "Industry 8 (Financial corp.)", "Industry 9 (other industries)"),
+       lty = 1, lwd = 2, bty = "n", col = c("red", "blue", "green", "black", "orange", "yellow", "pink", "darkgreen", "darkblue"))
+grid()
+
+# Second plot
+plot((Exo_model_S3$simulation$ck_dom_1 - Exo_model$simulation$ck_dom_1)/Exo_model$simulation$ck_dom_1*100,
+     col = "red", ylab = "% change from baseline", main = "Real final consumption", lwd = 3, ylim = c(-3, 0.5))
+lines((Exo_model_S3$simulation$ck_dom_2 - Exo_model$simulation$ck_dom_2)/Exo_model$simulation$ck_dom_2*100, col = "blue", lwd = 3)
+lines((Exo_model_S3$simulation$ck_dom_3 - Exo_model$simulation$ck_dom_3)/Exo_model$simulation$ck_dom_3*100, col = "green", lwd = 3)
+lines((Exo_model_S3$simulation$ck_dom_4 - Exo_model$simulation$ck_dom_4)/Exo_model$simulation$ck_dom_4*100, col = "black", lwd = 3)
+lines((Exo_model_S3$simulation$ck_dom_5 - Exo_model$simulation$ck_dom_5)/Exo_model$simulation$ck_dom_5*100, col = "orange", lwd = 3)
+lines((Exo_model_S3$simulation$ck_dom_6 - Exo_model$simulation$ck_dom_6)/Exo_model$simulation$ck_dom_6*100, col = "yellow", lwd = 3)
+lines((Exo_model_S3$simulation$ck_dom_7 - Exo_model$simulation$ck_dom_7)/Exo_model$simulation$ck_dom_7*100, col = "pink", lwd = 3)
+lines((Exo_model_S3$simulation$ck_dom_8 - Exo_model$simulation$ck_dom_8)/Exo_model$simulation$ck_dom_8*100, col = "darkgreen", lwd = 3)
+lines((Exo_model_S3$simulation$ck_dom_9 - Exo_model$simulation$ck_dom_9)/Exo_model$simulation$ck_dom_9*100, col = "darkblue", lwd = 3)
+legend("bottomleft", legend = c("Industry 1 (Agriculture)", "Industry 2 (Forestry)", "Industry 3 (Fishery)",
+                                "Industry 4 (Mining)", "Industry 5 (Manu. food)", "Industry 6 (Energy prod.)",
+                                "Industry 7 (Energy inten.)", "Industry 8 (Financial corp.)", "Industry 9 (other industries)"),
+       lty = 1, lwd = 2, bty = "n", col = c("red", "blue", "green", "black", "orange", "yellow", "pink", "darkgreen", "darkblue"))
+grid()
+
+
+plot((Exo_model_S3$simulation$exk_dom_1 - Exo_model$simulation$exk_dom_1)/Exo_model$simulation$exk_dom_1*100,
+     col = "red", ylab = "% change from baseline", main = "Real exports", lwd = 3, ylim = c(-1, 0.5))
+lines((Exo_model_S3$simulation$exk_dom_2 - Exo_model$simulation$exk_dom_2)/Exo_model$simulation$exk_dom_2*100, col = "blue", lwd = 3)
+lines((Exo_model_S3$simulation$exk_dom_3 - Exo_model$simulation$exk_dom_3)/Exo_model$simulation$exk_dom_3*100, col = "green", lwd = 3)
+lines((Exo_model_S3$simulation$exk_dom_4 - Exo_model$simulation$exk_dom_4)/Exo_model$simulation$exk_dom_4*100, col = "black", lwd = 3)
+lines((Exo_model_S3$simulation$exk_dom_5 - Exo_model$simulation$exk_dom_5)/Exo_model$simulation$exk_dom_5*100, col = "orange", lwd = 3)
+lines((Exo_model_S3$simulation$exk_dom_6 - Exo_model$simulation$exk_dom_6)/Exo_model$simulation$exk_dom_6*100, col = "yellow", lwd = 3)
+lines((Exo_model_S3$simulation$exk_dom_7 - Exo_model$simulation$exk_dom_7)/Exo_model$simulation$exk_dom_7*100, col = "pink", lwd = 3)
+lines((Exo_model_S3$simulation$exk_dom_8 - Exo_model$simulation$exk_dom_8)/Exo_model$simulation$exk_dom_8*100, col = "darkgreen", lwd = 3)
+lines((Exo_model_S3$simulation$exk_dom_9 - Exo_model$simulation$exk_dom_9)/Exo_model$simulation$exk_dom_9*100, col = "darkblue", lwd = 3)
+legend("bottomleft", legend = c("Industry 1 (Agriculture)", "Industry 2 (Forestry)", "Industry 3 (Fishery)",
+                                "Industry 4 (Mining)", "Industry 5 (Manu. food)", "Industry 6 (Energy prod.)",
+                                "Industry 7 (Energy inten.)", "Industry 8 (Financial corp.)", "Industry 9 (other industries)"),
+       lty = 1, lwd = 2, bty = "n", col = c("red", "blue", "green", "black", "orange", "yellow", "pink", "darkgreen", "darkblue"))
+grid()
+
+
+plot((zk_dom_1_sales_S3 - zk_dom_1_sales_BS)/zk_dom_1_sales_BS*100,
+     col = "red", ylab = "% change from baseline", main = "Real intermediate consumption", lwd = 3, ylim = c(-1.3, 0.5))
+lines((zk_dom_2_sales_S3 - zk_dom_2_sales_BS)/zk_dom_2_sales_BS*100, col = "blue", lwd = 3)
+lines((zk_dom_3_sales_S3 - zk_dom_3_sales_BS)/zk_dom_3_sales_BS*100, col = "green", lwd = 3)
+lines((zk_dom_4_sales_S3 - zk_dom_4_sales_BS)/zk_dom_4_sales_BS*100, col = "black", lwd = 3)
+lines((zk_dom_5_sales_S3 - zk_dom_5_sales_BS)/zk_dom_5_sales_BS*100, col = "orange", lwd = 3)
+lines((zk_dom_6_sales_S3 - zk_dom_6_sales_BS)/zk_dom_6_sales_BS*100, col = "yellow", lwd = 3)
+lines((zk_dom_7_sales_S3 - zk_dom_7_sales_BS)/zk_dom_7_sales_BS*100, col = "pink", lwd = 3)
+lines((zk_dom_8_sales_S3 - zk_dom_8_sales_BS)/zk_dom_8_sales_BS*100, col = "darkgreen", lwd = 3)
+lines((zk_dom_9_sales_S3 - zk_dom_9_sales_BS)/zk_dom_9_sales_BS*100, col = "darkblue", lwd = 3)
+legend("bottomleft", legend = c("Industry 1 (Agriculture)", "Industry 2 (Forestry)", "Industry 3 (Fishery)",
+                                "Industry 4 (Mining)", "Industry 5 (Manu. food)", "Industry 6 (Energy prod.)",
+                                "Industry 7 (Energy inten.)", "Industry 8 (Financial corp.)", "Industry 9 (other industries)"),
+       lty = 1, lwd = 2, bty = "n", col = c("red", "blue", "green", "black", "orange", "yellow", "pink", "darkgreen", "darkblue"))
+grid()
+
+
+# Adding a collective title for both plots
+mtext("Industry sales components", side = 3, outer = TRUE, line = 1, cex = 1.5)
+
+
+
+```
+
+
+
+```{r, fig.height=7, fig.width=15}
+
+par(mfrow=c(1,2))
+
+plot((Exo_model_S3$simulation$ck_dom_1 - Exo_model$simulation$ck_dom_1)/Exo_model$simulation$ck_dom_1*100, col= "red", ylab= "% change from baseline" , main= "Final consumption (domestic products)", lwd=3, ylim= c(-5,0));
+lines((Exo_model_S3$simulation$ck_dom_2 - Exo_model$simulation$ck_dom_2)/Exo_model$simulation$ck_dom_2*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S3$simulation$ck_dom_3 - Exo_model$simulation$ck_dom_3)/Exo_model$simulation$ck_dom_3*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S3$simulation$ck_dom_4 - Exo_model$simulation$ck_dom_4)/Exo_model$simulation$ck_dom_4*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S3$simulation$ck_dom_5 - Exo_model$simulation$ck_dom_5)/Exo_model$simulation$ck_dom_5*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S3$simulation$ck_dom_6 - Exo_model$simulation$ck_dom_6)/Exo_model$simulation$ck_dom_6*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S3$simulation$ck_dom_7 - Exo_model$simulation$ck_dom_7)/Exo_model$simulation$ck_dom_7*100, col = "pink", lwd=3, xlab="");
+lines((Exo_model_S3$simulation$ck_dom_8 - Exo_model$simulation$ck_dom_8)/Exo_model$simulation$ck_dom_8*100, col = "darkgreen", lwd=3, xlab="");
+lines((Exo_model_S3$simulation$ck_dom_9 - Exo_model$simulation$ck_dom_9)/Exo_model$simulation$ck_dom_9*100, col = "darkblue", lwd=3, xlab="");
+legend("bottomleft",legend=c("Industry 1 (Agriculture)", "Industry 2 (Forresty)","Industry 3 (Fishery)","Industry 4 (Mining)","Industry 5 (Manu. food)","Industry 6 (Energy prod.)","Industry 7 (Energy inten.)","Industry 8 (Financial corp.)","Industry 9 (other industries)"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink", "darkgreen", "darkblue")); grid()
+
+
+
+plot((Exo_model_S3$simulation$ck_im_1 - Exo_model$simulation$ck_im_1)/Exo_model$simulation$ck_im_1*100, col= "red", ylab= "% change from baseline" , main= "Final consumption (imported products)", lwd=3, ylim= c(-5,0));
+lines((Exo_model_S3$simulation$ck_im_2 - Exo_model$simulation$ck_im_2)/Exo_model$simulation$ck_im_2*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S3$simulation$ck_im_3 - Exo_model$simulation$ck_im_3)/Exo_model$simulation$ck_im_3*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S3$simulation$ck_im_4 - Exo_model$simulation$ck_im_4)/Exo_model$simulation$ck_im_4*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S3$simulation$ck_im_5 - Exo_model$simulation$ck_im_5)/Exo_model$simulation$ck_im_5*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S3$simulation$ck_im_6 - Exo_model$simulation$ck_im_6)/Exo_model$simulation$ck_im_6*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S3$simulation$ck_im_7 - Exo_model$simulation$ck_im_7)/Exo_model$simulation$ck_im_7*100, col = "pink", lwd=3, xlab="");
+lines((Exo_model_S3$simulation$ck_im_8 - Exo_model$simulation$ck_im_8)/Exo_model$simulation$ck_im_8*100, col = "darkgreen", lwd=3, xlab="");
+lines((Exo_model_S3$simulation$ck_im_9 - Exo_model$simulation$ck_im_9)/Exo_model$simulation$ck_im_9*100, col = "darkblue", lwd=3, xlab="");
+legend("bottomleft",legend=c("Industry 1 (Agriculture)", "Industry 2 (Forresty)","Industry 3 (Fishery)","Industry 4 (Mining)","Industry 5 (Manu. food)","Industry 6 (Energy prod.)","Industry 7 (Energy inten.)","Industry 8 (Financial corp.)","Industry 9 (other industries)"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink", "darkgreen", "darkblue")); grid()
+```
+
+```{r, fig.width=15, fig.height=7}
+par(mfrow=c(1,2))
+
+plot(Exo_model_S3$simulation$xk, col= "red", ylab= "B. DKR" , main= "Real Export" , xlim= c(c(1998,2020)), lwd=3, xlab="", cex.main=1); lines(Exo_model$simulation$xk, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Increase in interest rates", "Baseline"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=1); grid()
+
+plot(Exo_model_S3$simulation$imk, col= "red", ylab= "1000 people" , main= "Real Import" , lwd=3, xlab="", cex.main=1); 
+lines(Exo_model$simulation$imk, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Increase in interest rates", "Baseline"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=1); 
+grid()
+```
+
+
+```{r, fig.width=15, fig.height=7}
+
+par(mfrow=c(1,2))
+
+plot(Exo_model_S3$simulation$yk, col= "red", ylab= "B. DKR" , main= "Real GDP", ylim=c(1300,2300) , xlim= c(c(1998,2020)), lwd=3, xlab="", cex.main=1); lines(Exo_model$simulation$yk, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Increase in interest rates", "Baseline"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=1); grid()
+
+plot(Exo_model_S3$simulation$emp_tot, col= "red", ylab= "1000 people" , main= "employment" , lwd=3, xlab="", cex.main=1); 
+lines(Exo_model$simulation$emp_tot, col = "blue", lwd=3, xlab=""); 
+legend("topleft",legend=c("Increase in interest rates", "Baseline"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=1); 
+grid()
+
+
+
+```
+
+
+# Plots used in paper:
+
+
+```{r, fig.width=15, fig.height=10}
+
+par(mfrow = c(2, 2), oma = c(0, 0, 3, 0))  # oma sets the outer margins
+
+theme_journal()
+
+plot((Exo_model_S1$simulation$ppcon_oth_tot - Exo_model$simulation$ppcon_oth_tot)*100, ylim=c(-0,14),col= "red", ylab= "Change in percentage points" , main= "Consumer prices Scenario 1", lwd=3, xlab="", cex.main=1.5);
+lines((Exo_model_S1$simulation$ppcon_110_tot - Exo_model$simulation$ppcon_110_tot)*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S1$simulation$ppcon_120_tot - Exo_model$simulation$ppcon_120_tot)*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$ppcon_130_tot - Exo_model$simulation$ppcon_130_tot)*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$ppcon_140_tot - Exo_model$simulation$ppcon_140_tot)*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$ppcon_160_tot - Exo_model$simulation$ppcon_160_tot)*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$ppcon_180_tot - Exo_model$simulation$ppcon_180_tot)*100, col = "pink", lwd=3 , xlab="");
+lines((Exo_model_S1$simulation$ppcon_food_tot - Exo_model$simulation$ppcon_food_tot)*100, col = "darkblue", lwd=3 , xlab="");
+lines((Exo_model_S1$simulation$ppcon_tax - Exo_model$simulation$ppcon_tax)*100, col = "darkgreen", lwd=3 , xlab="");legend("topleft",legend=c("Other consumption", "Bread consumption","Meat consumption","Fish consumption","Dairy consumption","Fruit and vegetable consumption","Other food consumption","total food","total cons"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink", "darkblue", "darkgreen")); grid()
+
+
+plot((Exo_model_S2$simulation$ppcon_oth_tot - Exo_model$simulation$ppcon_oth_tot)*100, ylim=c(-4,4),col= "red", ylab= "Change in percentage points" , main= "Consumer prices Scenario 2", lwd=3, xlab="", cex.main=1.5);
+lines((Exo_model_S2$simulation$ppcon_110_tot - Exo_model$simulation$ppcon_110_tot)*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S2$simulation$ppcon_120_tot - Exo_model$simulation$ppcon_120_tot)*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$ppcon_130_tot - Exo_model$simulation$ppcon_130_tot)*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$ppcon_140_tot - Exo_model$simulation$ppcon_140_tot)*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$ppcon_160_tot - Exo_model$simulation$ppcon_160_tot)*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$ppcon_180_tot - Exo_model$simulation$ppcon_180_tot)*100, col = "pink", lwd=3 , xlab="");
+lines((Exo_model_S2$simulation$ppcon_food_tot - Exo_model$simulation$ppcon_food_tot)*100, col = "darkblue", lwd=3 , xlab="");
+lines((Exo_model_S2$simulation$ppcon_tax - Exo_model$simulation$ppcon_tax)*100, col = "darkgreen", lwd=3 , xlab="");legend("topleft",legend=c("Other consumption", "Bread consumption","Meat consumption","Fish consumption","Dairy consumption","Fruit and vegetable consumption","Other food consumption","total food","total cons"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink", "darkblue", "darkgreen")); grid()
+
+
+
+plot((Exo_model_S1$simulation$ck_oth_tot - Exo_model$simulation$ck_oth_tot)/Exo_model$simulation$ck_oth_tot*100, ylim=c(-10,3),col= "red", ylab= "Percentage change" , main= "Real consumptions Scenario 1", lwd=3, xlab="", cex.main=1.5);
+lines((Exo_model_S1$simulation$ck_110_tot - Exo_model$simulation$ck_110_tot)/Exo_model$simulation$ck_110_tot*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S1$simulation$ck_120_tot - Exo_model$simulation$ck_120_tot)/Exo_model$simulation$ck_120_tot*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$ck_130_tot - Exo_model$simulation$ck_130_tot)/Exo_model$simulation$ck_130_tot*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$ck_140_tot - Exo_model$simulation$ck_140_tot)/Exo_model$simulation$ck_140_tot*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$ck_160_tot - Exo_model$simulation$ck_160_tot)/Exo_model$simulation$ck_160_tot*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$ck_180_tot - Exo_model$simulation$ck_180_tot)/Exo_model$simulation$ck_180_tot*100, col = "pink", lwd=3 , xlab=""); legend("bottomleft",legend=c("Other consumption", "Bread consumption","Meat consumption","Fish consumption","Diary consumption","Fruit and vegetable consumption","Other food consumption"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink")); grid()
+
+
+
+plot((Exo_model_S2$simulation$ck_oth_tot - Exo_model$simulation$ck_oth_tot)/Exo_model$simulation$ck_oth_tot*100, ylim=c(-4,4),col= "red", ylab= "Percentage change" , main= "Real consumptions Scenario 2", lwd=3, xlab="", cex.main=1.5);
+lines((Exo_model_S2$simulation$ck_110_tot - Exo_model$simulation$ck_110_tot)/Exo_model$simulation$ck_110_tot*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S2$simulation$ck_120_tot - Exo_model$simulation$ck_120_tot)/Exo_model$simulation$ck_120_tot*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$ck_130_tot - Exo_model$simulation$ck_130_tot)/Exo_model$simulation$ck_130_tot*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$ck_140_tot - Exo_model$simulation$ck_140_tot)/Exo_model$simulation$ck_140_tot*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$ck_160_tot - Exo_model$simulation$ck_160_tot)/Exo_model$simulation$ck_160_tot*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$ck_180_tot - Exo_model$simulation$ck_180_tot)/Exo_model$simulation$ck_180_tot*100, col = "pink", lwd=3 , xlab=""); legend("bottomleft",legend=c("Other consumption", "Bread consumption","Meat consumption","Fish consumption","Diary consumption","Fruit and vegetable consumption","Other food consumption"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink")); grid()
+
+
+# Adding a collective title for both plots
+mtext("Substitution effect on final consumption", side = 3, outer = TRUE, line = 1, cex = 1.5)
+
+```
+
+
+
+```{r, fig.width=15, fig.height=10}
+
+par(mfrow = c(2, 2), oma = c(0, 0, 3, 0))  # oma sets the outer margins
+
+
+theme_journal()
+
+
+
+
+
+plot((Exo_model_S2$simulation$exk_dom_1 - Exo_model$simulation$exk_dom_1)/Exo_model$simulation$exk_dom_1*100, ylim=c(-70,2),col= "red", ylab= "Percentage change" , main= "Change in Real Exports: Scenario 2", lwd=3, xlab="", cex.main=1.5);
+lines((Exo_model_S2$simulation$exk_dom_2 - Exo_model$simulation$exk_dom_2)/Exo_model$simulation$exk_dom_2*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S2$simulation$exk_dom_3 - Exo_model$simulation$exk_dom_3)/Exo_model$simulation$exk_dom_3*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$exk_dom_4 - Exo_model$simulation$exk_dom_4)/Exo_model$simulation$exk_dom_4*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$exk_dom_5 - Exo_model$simulation$exk_dom_5)/Exo_model$simulation$exk_dom_5*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$exk_dom_6 - Exo_model$simulation$exk_dom_6)/Exo_model$simulation$exk_dom_6*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$exk_dom_7 - Exo_model$simulation$exk_dom_7)/Exo_model$simulation$exk_dom_7*100, col = "pink", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$exk_dom_8 - Exo_model$simulation$exk_dom_8)/Exo_model$simulation$exk_dom_8*100, col = "darkgreen", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$exk_dom_9 - Exo_model$simulation$exk_dom_9)/Exo_model$simulation$exk_dom_9*100, col = "darkblue", lwd=3, xlab="");
+legend("bottomleft",legend=c("Industry 1 (Agriculture)", "Industry 2 (Forresty)","Industry 3 (Fishery)","Industry 4 (Mining)","Industry 5 (Manu. food)","Industry 6 (Energy prod.)","Industry 7 (Energy inten.)","Industry 8 (Financial corp.)","Industry 9 (other industries)"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink", "darkgreen", "darkblue")); grid()
+
+
+
+
+plot((Exo_model_S2$simulation$phi_c_oth - Exo_model$simulation$phi_c_oth)*100, col= "red", ylab= "Level change from baseline" , main= "Import shares of final consumption: Scenario 2", lwd=3, ylim= c(-0,5), cex.main=1.5);
+lines((Exo_model_S2$simulation$phi_c_110 - Exo_model$simulation$phi_c_110)*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S2$simulation$phi_c_120 - Exo_model$simulation$phi_c_120)*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$phi_c_130 - Exo_model$simulation$phi_c_130)*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$phi_c_140 - Exo_model$simulation$phi_c_140)*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$phi_c_160 - Exo_model$simulation$phi_c_160)*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$phi_c_180 - Exo_model$simulation$phi_c_180)*100, col = "pink", lwd=3, xlab="");
+legend("topleft",legend=c("Other consumption", "Bread consumption","Meat consumption","Fish consumption","Diary consumption","Fruit and vegetable consumption","Other food consumption"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink")); grid()
+
+
+
+
+plot(zk_im_1_tot_S2/zk_1_tot_S2*100 - zk_im_1_tot_BS/zk_1_tot_BS*100, col= "red", ylab= "Percentage change from baseline" , main= "Import shares on inputs: Scenario 2", lwd=3, ylim= c(-0.2,5), cex.main=1.5);
+lines(zk_im_2_tot_S2/zk_2_tot_S2*100 - zk_im_2_tot_BS/zk_2_tot_BS*100, col = "blue", lwd=3, xlab=""); 
+lines(zk_im_3_tot_S2/zk_3_tot_S2*100 - zk_im_3_tot_BS/zk_3_tot_BS*100, col = "green", lwd=3, xlab="");
+lines(zk_im_4_tot_S2/zk_4_tot_S2*100 - zk_im_4_tot_BS/zk_4_tot_BS*100, col = "black", lwd=3, xlab="");
+lines(zk_im_5_tot_S2/zk_5_tot_S2*100 - zk_im_5_tot_BS/zk_5_tot_BS*100, col = "orange", lwd=3, xlab="");
+lines(zk_im_6_tot_S2/zk_6_tot_S2*100 - zk_im_6_tot_BS/zk_6_tot_BS*100, col = "yellow", lwd=3, xlab="");
+lines(zk_im_7_tot_S2/zk_7_tot_S2*100 - zk_im_7_tot_BS/zk_7_tot_BS*100, col = "pink", lwd=3, xlab="");
+lines(zk_im_8_tot_S2/zk_8_tot_S2*100 - zk_im_8_tot_BS/zk_8_tot_BS*100, col = "darkgreen", lwd=3, xlab="");
+lines(zk_im_9_tot_S2/zk_9_tot_S2*100 - zk_im_9_tot_BS/zk_9_tot_BS*100, col = "darkblue", lwd=3, xlab="");
+legend("topleft",legend=c("Industry 1 (Agriculture)", "Industry 2 (Forresty)","Industry 3 (Fishery)","Industry 4 (Mining)","Industry 5 (Manu. food)","Industry 6 (Energy prod.)","Industry 7 (Energy inten.)","Industry 8 (Financial corp.)","Industry 9 (other industries)"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink", "darkgreen", "darkblue")); grid()
+
+
+plot((Exo_model_S2$simulation$nxk - Exo_model$simulation$nxk), col= "red", ylab= "Change from baseline (B. DKR)" , main= "Real net-export: Scenario 2" , xlim= c(1998,2020), lwd=3, xlab="", cex.main=1.5);grid()
+
+
+# Adding a collective title for both plots
+mtext("Effect on international trade Scenario 2", side = 3, outer = TRUE, line = 1, cex = 1.5)
+
+```
+
+
+
+```{r, fig.width=15, fig.height=10}
+
+par(mfrow = c(2, 2), oma = c(0, 0, 3, 0))  # oma sets the outer margins
+
+
+theme_journal()
+
+plot((Exo_model_S1$simulation$exk_dom_1 - Exo_model$simulation$exk_dom_1)/Exo_model$simulation$exk_dom_1*100, ylim=c(-70,2),col= "red", ylab= "Percentage change" , main= "Change in Real Exports: Scenario 1", lwd=3, xlab="", cex.main=1.5);
+lines((Exo_model_S1$simulation$exk_dom_2 - Exo_model$simulation$exk_dom_2)/Exo_model$simulation$exk_dom_2*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S1$simulation$exk_dom_3 - Exo_model$simulation$exk_dom_3)/Exo_model$simulation$exk_dom_3*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$exk_dom_4 - Exo_model$simulation$exk_dom_4)/Exo_model$simulation$exk_dom_4*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$exk_dom_5 - Exo_model$simulation$exk_dom_5)/Exo_model$simulation$exk_dom_5*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$exk_dom_6 - Exo_model$simulation$exk_dom_6)/Exo_model$simulation$exk_dom_6*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$exk_dom_7 - Exo_model$simulation$exk_dom_7)/Exo_model$simulation$exk_dom_7*100, col = "pink", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$exk_dom_8 - Exo_model$simulation$exk_dom_8)/Exo_model$simulation$exk_dom_8*100, col = "darkgreen", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$exk_dom_9 - Exo_model$simulation$exk_dom_9)/Exo_model$simulation$exk_dom_9*100, col = "darkblue", lwd=3, xlab="");
+legend("bottomleft",legend=c("Industry 1 (Agriculture)", "Industry 2 (Forresty)","Industry 3 (Fishery)","Industry 4 (Mining)","Industry 5 (Manu. food)","Industry 6 (Energy prod.)","Industry 7 (Energy inten.)","Industry 8 (Financial corp.)","Industry 9 (other industries)"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink", "darkgreen", "darkblue")); grid()
+
+
+
+
+plot((Exo_model_S1$simulation$phi_c_oth - Exo_model$simulation$phi_c_oth)*100, col= "red", ylab= "Level change from baseline" , main= "Import shares of final consumption: Scenario 1", lwd=3, ylim= c(-0,5), cex.main=1.5);
+lines((Exo_model_S1$simulation$phi_c_110 - Exo_model$simulation$phi_c_110)*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S1$simulation$phi_c_120 - Exo_model$simulation$phi_c_120)*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$phi_c_130 - Exo_model$simulation$phi_c_130)*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$phi_c_140 - Exo_model$simulation$phi_c_140)*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$phi_c_160 - Exo_model$simulation$phi_c_160)*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$phi_c_180 - Exo_model$simulation$phi_c_180)*100, col = "pink", lwd=3, xlab="");
+legend("topleft",legend=c("Other consumption", "Bread consumption","Meat consumption","Fish consumption","Diary consumption","Fruit and vegetable consumption","Other food consumption"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink")); grid()
+
+
+
+
+plot(zk_im_1_tot_S1/zk_1_tot_S1*100 - zk_im_1_tot_BS/zk_1_tot_BS*100, col= "red", ylab= "Percentage change from baseline" , main= "Import shares on inputs: Scenario 1", lwd=3, ylim= c(-0.2,5), cex.main=1.5);
+lines(zk_im_2_tot_S1/zk_2_tot_S1*100 - zk_im_2_tot_BS/zk_2_tot_BS*100, col = "blue", lwd=3, xlab=""); 
+lines(zk_im_3_tot_S1/zk_3_tot_S1*100 - zk_im_3_tot_BS/zk_3_tot_BS*100, col = "green", lwd=3, xlab="");
+lines(zk_im_4_tot_S1/zk_4_tot_S1*100 - zk_im_4_tot_BS/zk_4_tot_BS*100, col = "black", lwd=3, xlab="");
+lines(zk_im_5_tot_S1/zk_5_tot_S1*100 - zk_im_5_tot_BS/zk_5_tot_BS*100, col = "orange", lwd=3, xlab="");
+lines(zk_im_6_tot_S1/zk_6_tot_S1*100 - zk_im_6_tot_BS/zk_6_tot_BS*100, col = "yellow", lwd=3, xlab="");
+lines(zk_im_7_tot_S1/zk_7_tot_S1*100 - zk_im_7_tot_BS/zk_7_tot_BS*100, col = "pink", lwd=3, xlab="");
+lines(zk_im_8_tot_S1/zk_8_tot_S1*100 - zk_im_8_tot_BS/zk_8_tot_BS*100, col = "darkgreen", lwd=3, xlab="");
+lines(zk_im_9_tot_S1/zk_9_tot_S1*100 - zk_im_9_tot_BS/zk_9_tot_BS*100, col = "darkblue", lwd=3, xlab="");
+legend("topleft",legend=c("Industry 1 (Agriculture)", "Industry 2 (Forresty)","Industry 3 (Fishery)","Industry 4 (Mining)","Industry 5 (Manu. food)","Industry 6 (Energy prod.)","Industry 7 (Energy inten.)","Industry 8 (Financial corp.)","Industry 9 (other industries)"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink", "darkgreen", "darkblue")); grid()
+
+
+plot((Exo_model_S1$simulation$nxk - Exo_model$simulation$nxk), col= "red", ylab= "Change from baseline (B. DKR)" , main= "Real net-export" , xlim= c(1998,2020), lwd=3, xlab="", cex.main=1.5);grid()
+
+
+# Adding a collective title for both plots
+mtext("Effect on international trade Scenario 1", side = 3, outer = TRUE, line = 1, cex = 1.5)
+
+```
+
+
+
+
+```{r, fig.width=15, fig.height=10}
+
+par(mfrow=c(2,2), oma = c(0, 0, 3, 0))  # oma sets the outer margins
+
+# Apply the theme
+theme_journal()
+
+
+plot((Exo_model_S1$simulation$fnw_hk - Exo_model$simulation$fnw_hk), col= "red", ylab= "Change from baseline (B. DKR)" , main= "Financial net wealth HH" , xlim= c(c(1998,2020)),ylim= c(-30,10), lwd=3, xlab="", cex.main=1.5);lines((Exo_model_S2$simulation$fnw_hk - Exo_model$simulation$fnw_hk), col = "blue", lwd=3, xlab="");grid()
+
+plot((Exo_model_S1$simulation$fnw_gk - Exo_model$simulation$fnw_gk), col= "red", ylab= "Change from baseline (B. DKR)" , main= "Financial net wealth Government" , xlim= c(1998,2020), ylim= c(-25,25), lwd=3, xlab="", cex.main=1.5);lines((Exo_model_S2$simulation$fnw_gk - Exo_model$simulation$fnw_gk), col = "blue", lwd=3, xlab="");grid()
+
+
+plot((Exo_model_S1$simulation$fnw_nfck - Exo_model$simulation$fnw_nfck), col= "red", ylab= "Change from baseline (B. DKR)" , main= "Financial net wealth Non-financial corporations" , xlim= c(1998,2020), ylim= c(-25,14), lwd=3, xlab="", cex.main=1.5);lines((Exo_model_S2$simulation$fnw_nfck - Exo_model$simulation$fnw_nfck), col = "blue", lwd=3, xlab="");grid()
+
+
+
+plot((Exo_model_S1$simulation$fnw_rowk - Exo_model$simulation$fnw_rowk), col= "red", ylab= "Change from baseline (B. DKR)" , main= "Financial net wealth ROW" , xlim= c(1998,2020), ylim= c(-20,50), lwd=3, xlab="", cex.main=1.5);lines((Exo_model_S2$simulation$fnw_rowk - Exo_model$simulation$fnw_rowk), col = "blue", lwd=3, xlab="");grid()
+
+
+# Adding a collective title for both plots
+mtext("Financial net-wealth", side = 3, outer = TRUE, line = 1, cex = 1.7)
+
+```
+
+```{r, fig.width=15, fig.height=7}
+
+par(mfrow=c(1,2), oma = c(0, 0, 3, 0))  # oma sets the outer margins
+
+# Apply the theme
+theme_journal()
+
+plot((Exo_model_S1$simulation$b2_1/Exo_model_S1$simulation$pout_1 - Exo_model$simulation$b2_1/Exo_model$simulation$pout_1)/Exo_model$simulation$b2_1/Exo_model$simulation$pout_1*100, col= "red", ylab= "% change from baseline" , main= "Profits and mixed income", lwd=3, ylim= c(-28,2));
+lines((Exo_model_S1$simulation$b2_2/Exo_model_S1$simulation$pout_2 - Exo_model$simulation$b2_2/Exo_model$simulation$pout_2)/Exo_model$simulation$b2_2/Exo_model$simulation$pout_2*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S1$simulation$b2_3/Exo_model_S1$simulation$pout_3 - Exo_model$simulation$b2_3/Exo_model$simulation$pout_3)/Exo_model$simulation$b2_3/Exo_model$simulation$pout_3*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$b2_4/Exo_model_S1$simulation$pout_4 - Exo_model$simulation$b2_4/Exo_model$simulation$pout_4)/Exo_model$simulation$b2_4/Exo_model$simulation$pout_4*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$b2_5/Exo_model_S1$simulation$pout_5 - Exo_model$simulation$b2_5/Exo_model$simulation$pout_5)/Exo_model$simulation$b2_5/Exo_model$simulation$pout_5*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$b2_6/Exo_model_S1$simulation$pout_6 - Exo_model$simulation$b2_6/Exo_model$simulation$pout_6)/Exo_model$simulation$b2_6/Exo_model$simulation$pout_6*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$b2_7/Exo_model_S1$simulation$pout_7 - Exo_model$simulation$b2_7/Exo_model$simulation$pout_7)/Exo_model$simulation$b2_7/Exo_model$simulation$pout_7*100, col = "pink", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$b2_8/Exo_model_S1$simulation$pout_8 - Exo_model$simulation$b2_8/Exo_model$simulation$pout_8)/Exo_model$simulation$b2_8/Exo_model$simulation$pout_8*100, col = "darkgreen", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$b2_9/Exo_model_S1$simulation$pout_9 - Exo_model$simulation$b2_9/Exo_model$simulation$pout_9)/Exo_model$simulation$b2_9/Exo_model$simulation$pout_9*100, col = "darkblue", lwd=3, xlab="");
+legend("bottomleft",legend=c("Industry 1 (Agriculture)", "Industry 2 (Forresty)","Industry 3 (Fishery)","Industry 4 (Mining)","Industry 5 (Manu. food)","Industry 6 (Energy prod.)","Industry 7 (Energy inten.)","Industry 8 (Financial corp.)","Industry 9 (other industries)"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink", "darkgreen", "darkblue")); grid()
+
+
+
+
+
+plot((Exo_model_S2$simulation$b2_1/Exo_model_S2$simulation$pout_1 - Exo_model$simulation$b2_1/Exo_model$simulation$pout_1)/Exo_model$simulation$b2_1/Exo_model$simulation$pout_1*100, col= "red", ylab= "% change from baseline" , main= "Profits and mixed income", lwd=3, ylim= c(-28,2));
+lines((Exo_model_S2$simulation$b2_2/Exo_model_S2$simulation$pout_2 - Exo_model$simulation$b2_2/Exo_model$simulation$pout_2)/Exo_model$simulation$b2_2/Exo_model$simulation$pout_2*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S2$simulation$b2_3/Exo_model_S2$simulation$pout_3 - Exo_model$simulation$b2_3/Exo_model$simulation$pout_3)/Exo_model$simulation$b2_3/Exo_model$simulation$pout_3*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$b2_4/Exo_model_S2$simulation$pout_4 - Exo_model$simulation$b2_4/Exo_model$simulation$pout_4)/Exo_model$simulation$b2_4/Exo_model$simulation$pout_4*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$b2_5/Exo_model_S2$simulation$pout_5 - Exo_model$simulation$b2_5/Exo_model$simulation$pout_5)/Exo_model$simulation$b2_5/Exo_model$simulation$pout_5*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$b2_6/Exo_model_S2$simulation$pout_6 - Exo_model$simulation$b2_6/Exo_model$simulation$pout_6)/Exo_model$simulation$b2_6/Exo_model$simulation$pout_6*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$b2_7/Exo_model_S2$simulation$pout_7 - Exo_model$simulation$b2_7/Exo_model$simulation$pout_7)/Exo_model$simulation$b2_7/Exo_model$simulation$pout_7*100, col = "pink", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$b2_8/Exo_model_S2$simulation$pout_8 - Exo_model$simulation$b2_8/Exo_model$simulation$pout_8)/Exo_model$simulation$b2_8/Exo_model$simulation$pout_8*100, col = "darkgreen", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$b2_9/Exo_model_S2$simulation$pout_9 - Exo_model$simulation$b2_9/Exo_model$simulation$pout_9)/Exo_model$simulation$b2_9/Exo_model$simulation$pout_9*100, col = "darkblue", lwd=3, xlab="");
+legend("bottomleft",legend=c("Industry 1 (Agriculture)", "Industry 2 (Forresty)","Industry 3 (Fishery)","Industry 4 (Mining)","Industry 5 (Manu. food)","Industry 6 (Energy prod.)","Industry 7 (Energy inten.)","Industry 8 (Financial corp.)","Industry 9 (other industries)"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink", "darkgreen", "darkblue")); grid()
+
+
+
+# Adding a collective title for both plots
+mtext("Aggregate economic effects", side = 3, outer = TRUE, line = 1, cex = 1.7)
+
+```
+
+
+
+
+```{r, fig.width=15, fig.height=10}
+
+par(mfrow = c(2, 2), oma = c(0, 0, 3, 0))  # oma sets the outer margins
+
+plot((Exo_model_S1$simulation$Co2E_1 - Exo_model$simulation$Co2E_1)/Exo_model$simulation$Co2E_1*100, col= "red", ylab= "Percentage change from baseline" , main= "Total Co2-Equivelant emission: Scenario 1", lwd=3, ylim= c(-0.5,0));
+lines((Exo_model_S1$simulation$Co2E_2 - Exo_model$simulation$Co2E_2)/Exo_model$simulation$Co2E_2*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S1$simulation$Co2E_3 - Exo_model$simulation$Co2E_3)/Exo_model$simulation$Co2E_3*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$Co2E_4 - Exo_model$simulation$Co2E_4)/Exo_model$simulation$Co2E_4*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$Co2E_5 - Exo_model$simulation$Co2E_5)/Exo_model$simulation$Co2E_5*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$Co2E_6 - Exo_model$simulation$Co2E_6)/Exo_model$simulation$Co2E_6*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$Co2E_7 - Exo_model$simulation$Co2E_7)/Exo_model$simulation$Co2E_7*100, col = "pink", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$Co2E_8 - Exo_model$simulation$Co2E_8)/Exo_model$simulation$Co2E_8*100, col = "darkgreen", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$Co2E_9 - Exo_model$simulation$Co2E_9)/Exo_model$simulation$Co2E_9*100, col = "darkblue", lwd=3, xlab="");
+lines((Exo_model_S1$simulation$Co2E_HH - Exo_model$simulation$Co2E_HH)/Exo_model$simulation$Co2E_HH*100, col = "darkred", lwd=3, xlab="");
+legend("bottomleft",legend=c("Industry 1 (Agriculture)", "Industry 2 (Forresty)","Industry 3 (Fishery)","Industry 4 (Mining)","Industry 5 (Manu. food)","Industry 6 (Energy prod.)","Industry 7 (Energy inten.)","Industry 8 (Financial corp.)","Industry 9 (other industries)", "HH"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink", "darkgreen", "darkblue","darkred")); grid()
+
+
+plot((Exo_model_S2$simulation$Co2E_1 - Exo_model$simulation$Co2E_1)/Exo_model$simulation$Co2E_1*100, col= "red", ylab= "Percentage change from baseline" , main= "Total Co2-Equivelant emission: Scenario 2", lwd=3, ylim= c(-20,1));
+lines((Exo_model_S2$simulation$Co2E_2 - Exo_model$simulation$Co2E_2)/Exo_model$simulation$Co2E_2*100, col = "blue", lwd=3, xlab=""); 
+lines((Exo_model_S2$simulation$Co2E_3 - Exo_model$simulation$Co2E_3)/Exo_model$simulation$Co2E_3*100, col = "green", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$Co2E_4 - Exo_model$simulation$Co2E_4)/Exo_model$simulation$Co2E_4*100, col = "black", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$Co2E_5 - Exo_model$simulation$Co2E_5)/Exo_model$simulation$Co2E_5*100, col = "orange", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$Co2E_6 - Exo_model$simulation$Co2E_6)/Exo_model$simulation$Co2E_6*100, col = "yellow", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$Co2E_7 - Exo_model$simulation$Co2E_7)/Exo_model$simulation$Co2E_7*100, col = "pink", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$Co2E_8 - Exo_model$simulation$Co2E_8)/Exo_model$simulation$Co2E_8*100, col = "darkgreen", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$Co2E_9 - Exo_model$simulation$Co2E_9)/Exo_model$simulation$Co2E_9*100, col = "darkblue", lwd=3, xlab="");
+lines((Exo_model_S2$simulation$Co2E_HH - Exo_model$simulation$Co2E_HH)/Exo_model$simulation$Co2E_HH*100, col = "darkred", lwd=3, xlab="");
+legend("bottomleft",legend=c("Industry 1 (Agriculture)", "Industry 2 (Forresty)","Industry 3 (Fishery)","Industry 4 (Mining)","Industry 5 (Manu. food)","Industry 6 (Energy prod.)","Industry 7 (Energy inten.)","Industry 8 (Financial corp.)","Industry 9 (other industries)", "HH"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue","green", "black","orange", "yellow", "pink", "darkgreen", "darkblue","darkred")); grid()
+
+
+plot((Exo_model_S1$simulation$Co2E_tot - Exo_model$simulation$Co2E_tot)/Exo_model$simulation$Co2E_tot*100, col= "red", ylab= "Percentage change in Co2 equivelant" , main= "Total Co2-Equivelant emission: Scenario 1", lwd=3); 
+legend("bottomleft",legend=c("implementation of consumer tax", "Baseline"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=1); grid()
+
+
+plot((Exo_model_S2$simulation$Co2E_tot - Exo_model$simulation$Co2E_tot)/Exo_model$simulation$Co2E_tot*100, col= "red", ylab= "Percentage change in Co2 equivelant" , main= "Total Co2-Equivelant emission: Scenario 2", lwd=3); 
+legend("bottomleft",legend=c("implementation of consumer tax", "Baseline"),lty=c(1,1),lwd=c(2),bty="n", col = c("red", "blue"), cex=1); grid()
+
+
+# Adding a collective title for both plots
+mtext("Effects on Co2E emissions", side = 3, outer = TRUE, line = 1, cex = 1.5)
+
+```
+
+
+
+
