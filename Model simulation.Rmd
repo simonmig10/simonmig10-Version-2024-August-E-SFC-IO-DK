@@ -4,6 +4,9 @@ author: "Simon Fløj Thomsen"
 date: "2024-08-26"
 output: html_document
 ---
+
+Thanks for taking a look at the model simulation code, if anything is unclear please feel free to reach out: sft@business.aau.dk.
+
 # Start 
 
 ```{r}
@@ -71,16 +74,16 @@ We import all the necessary data. The data provided in the model data folder are
 ```{r}
 
 library(readxl)
-Model_data_1995 <- read_excel("Model_data_1995.xlsx") #Import sectoral national acc. data
-Model_data_1996 <- read_excel("Model_data_1996.xlsx") #Import sectoral national acc. data
-Trade_variables <- read_excel("Trade variables.xlsx") #Import trade variables
-Model_data_collected_IO <- read_excel("Model_data_collected_IO_117.xlsx") # Import IO data
-Emission_coeff_data <- read_excel("Emission_coeff_data.xlsx") # Import emission coeff data
-Model_data_RER_1995 <- read_excel("Model_data_RER_1995.xlsx") # Import price and real exchange rate data
-Model_data_RER_1996 <- read_excel("Model_data_RER_1996.xlsx") # Import price and real exchange rate data
-Model_baci_data <- read_excel("Model_baci_data.xlsx") # Import market share data
-Model_data_cons <- read_excel("Model_data_cons.xlsx") # Import consumption share data
-Model_data_industry_sector_shares <- read_excel("Model_data_industry_sector_shares.xlsx") # Import shares connecting indsutry and sector data
+Model_data_1995 <- read_excel("Model data/Model_data_1995.xlsx") #Import sectoral national acc. data
+Model_data_1996 <- read_excel("Model data/Model_data_1996.xlsx") #Import sectoral national acc. data
+Trade_variables <- read_excel("Model data/Trade variables.xlsx") #Import trade variables
+Model_data_collected_IO <- read_excel("Model data/Model_data_collected_IO_117.xlsx") # Import IO data
+Emission_coeff_data <- read_excel("Model data/Emission_coeff_data.xlsx") # Import emission coeff data
+Model_data_RER_1995 <- read_excel("Model data/Model_data_RER_1995.xlsx") # Import price and real exchange rate data
+Model_data_RER_1996 <- read_excel("Model data/Model_data_RER_1996.xlsx") # Import price and real exchange rate data
+Model_baci_data <- read_excel("Model data/Model_baci_data.xlsx") # Import market share data
+Model_data_cons <- read_excel("Model data/Model_data_cons.xlsx") # Import consumption share data
+Model_data_industry_sector_shares <- read_excel("Model data/Model_data_industry_sector_shares.xlsx") # Import shares connecting indsutry and sector data
 
 
 ## We create time series 
