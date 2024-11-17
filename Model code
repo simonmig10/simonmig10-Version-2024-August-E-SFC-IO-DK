@@ -1,8 +1,6 @@
 MODEL
 
 
-
-
 COMMENT> ####################################### Shock to interrest rates ##########################################
 
 
@@ -70,8 +68,6 @@ IF> Scenario_3 > 0
 COMMENT>
 IDENTITY> Scenario_3
 EQ> Scenario_3 = Scenario_3*1
-
-
 
 
 COMMENT> ####################################### Price indexes for final demand ####################################################################
@@ -315,7 +311,16 @@ EQ> pg = g/(gov_dom_1/pout_1 + gov_dom_2/pout_2 + gov_dom_3/pout_3 + gov_dom_4/p
 
 COMMENT> aggregate import price index (Data to compare with should be the one calculated in price indexes)
 IDENTITY> pim
-EQ> pim = im/((z_im_11 + z_im_12 + z_im_13 + z_im_14 + z_im_15 + z_im_16 + z_im_17 + z_im_18 + z_im_19 + c_im_1 + gov_im_1 + inv_im_1 + invent_im_1 + ex_im_1)/pim_1 + (z_im_21 + z_im_22 + z_im_23 + z_im_24 + z_im_25 + z_im_26 + z_im_27  + z_im_28  + z_im_29 + c_im_2 + gov_im_2 + inv_im_2 + invent_im_2 + ex_im_2)/pim_2 + (z_im_31 + z_im_32 + z_im_33 + z_im_34 + z_im_35 + z_im_36 + z_im_37 + z_im_38 + z_im_39 + c_im_3 + gov_im_3 + inv_im_3 + invent_im_3 + ex_im_3)/pim_3 + (z_im_41 + z_im_42 + z_im_43 + z_im_44 + z_im_45 + z_im_46 + z_im_47 + z_im_48 + z_im_49 + c_im_4 + gov_im_4 + inv_im_4 + invent_im_4 + ex_im_4)/pim_4 + (z_im_51 + z_im_52 + z_im_53 + z_im_54 + z_im_55 + z_im_56 + z_im_57 + z_im_58 + z_im_59 + c_im_5 + gov_im_5 + inv_im_5 + invent_im_5 + ex_im_5)/pim_5 + (z_im_61 + z_im_62 + z_im_63 + z_im_64 + z_im_65 + z_im_66 + z_im_67 + z_im_68 + z_im_69 + c_im_6 + gov_im_6 + inv_im_6 + invent_im_6 + ex_im_6)/pim_6 + (z_im_71 + z_im_72 + z_im_73 + z_im_74 + z_im_75 + z_im_76 + z_im_77 + z_im_78 + z_im_79 + c_im_7 + gov_im_7 + inv_im_7 + invent_im_7 + ex_im_7)/pim_7 + (z_im_81 + z_im_82 + z_im_83 + z_im_84 + z_im_85 + z_im_86 + z_im_87 + z_im_88 + z_im_89 + c_im_8 + gov_im_8 + inv_im_8 + invent_im_8 + ex_im_8)/pim_9 + (z_im_91 + z_im_92 + z_im_93 + z_im_94 + z_im_95 + z_im_96 + z_im_97 + z_im_98 + z_im_99 + c_im_9 + gov_im_9 + inv_im_9 + invent_im_9 + ex_im_9)/pim_9 + (z_im_un_1 + z_im_un_2 + z_im_un_3 + z_im_un_4 + z_im_un_5 + z_im_un_6+ z_im_un_7+ z_im_un_8+ z_im_un_9 + c_im_un + gov_im_un + inv_im_un + invent_im_un + ex_im_un)/pim_un)
+EQ> pim = im/((z_im_11 + z_im_12 + z_im_13 + z_im_14 + z_im_15 + z_im_16 + z_im_17 + z_im_18 + z_im_19 + c_im_1 + gov_im_1 + inv_im_1 + invent_im_1 + ex_im_1)/pim_1
++ (z_im_21 + z_im_22 + z_im_23 + z_im_24 + z_im_25 + z_im_26 + z_im_27  + z_im_28  + z_im_29 + c_im_2 + gov_im_2 + inv_im_2 + invent_im_2 + ex_im_2)/pim_2
++ (z_im_31 + z_im_32 + z_im_33 + z_im_34 + z_im_35 + z_im_36 + z_im_37 + z_im_38 + z_im_39 + c_im_3 + gov_im_3 + inv_im_3 + invent_im_3 + ex_im_3)/pim_3
++ (z_im_41 + z_im_42 + z_im_43 + z_im_44 + z_im_45 + z_im_46 + z_im_47 + z_im_48 + z_im_49 + c_im_4 + gov_im_4 + inv_im_4 + invent_im_4 + ex_im_4)/pim_4
++ (z_im_51 + z_im_52 + z_im_53 + z_im_54 + z_im_55 + z_im_56 + z_im_57 + z_im_58 + z_im_59 + c_im_5 + gov_im_5 + inv_im_5 + invent_im_5 + ex_im_5)/pim_5
++ (z_im_61 + z_im_62 + z_im_63 + z_im_64 + z_im_65 + z_im_66 + z_im_67 + z_im_68 + z_im_69 + c_im_6 + gov_im_6 + inv_im_6 + invent_im_6 + ex_im_6)/pim_6
++ (z_im_71 + z_im_72 + z_im_73 + z_im_74 + z_im_75 + z_im_76 + z_im_77 + z_im_78 + z_im_79 + c_im_7 + gov_im_7 + inv_im_7 + invent_im_7 + ex_im_7)/pim_7
++ (z_im_81 + z_im_82 + z_im_83 + z_im_84 + z_im_85 + z_im_86 + z_im_87 + z_im_88 + z_im_89 + c_im_8 + gov_im_8 + inv_im_8 + invent_im_8 + ex_im_8)/pim_8
++ (z_im_91 + z_im_92 + z_im_93 + z_im_94 + z_im_95 + z_im_96 + z_im_97 + z_im_98 + z_im_99 + c_im_9 + gov_im_9 + inv_im_9 + invent_im_9 + ex_im_9)/pim_9
++ (z_im_un_1 + z_im_un_2 + z_im_un_3 + z_im_un_4 + z_im_un_5 + z_im_un_6+ z_im_un_7+ z_im_un_8+ z_im_un_9 + c_im_un + gov_im_un + inv_im_un + invent_im_un + ex_im_un)/pim_un)
 
 
 COMMENT> Consumer price for other consumption products (oth)
@@ -350,7 +355,7 @@ EQ> pim_180= c_180_im_tot/(c_180_im_1/pim_1  + c_180_im_2/pim_2  + c_180_im_3/pi
 
 COMMENT> 
 IDENTITY> rer_1
-EQ> rer_1 = pout_1*xr/pim_1
+EQ> rer_1 = pout_1/pim_1
 
 
 COMMENT> 
@@ -394,7 +399,7 @@ EQ> phi_z_19 = exp(phi_z_intercept_19 + TSLAG(log(rer_1),1)*2.5) + res_phi_z_19
 
 COMMENT> 
 IDENTITY> rer_2
-EQ> rer_2 = pout_2*xr/pim_2
+EQ> rer_2 = pout_2/pim_2
 
 
 COMMENT> 
@@ -438,7 +443,7 @@ EQ> phi_z_29 = exp(phi_z_intercept_29 + TSLAG(log(rer_2),1)*1) + res_phi_z_29
 
 COMMENT> 
 IDENTITY> rer_3
-EQ> rer_3 = pout_3*xr/pim_3
+EQ> rer_3 = pout_3/pim_3
 
 
 COMMENT> 
@@ -484,7 +489,7 @@ EQ> phi_z_39 = exp(phi_z_intercept_39 + TSLAG(log(rer_3),1)*2.5) + res_phi_z_39
 
 COMMENT> 
 IDENTITY> rer_4
-EQ> rer_4 = pout_4*xr/pim_4
+EQ> rer_4 = pout_4/pim_4
 
 
 
@@ -530,7 +535,7 @@ EQ> phi_z_49 = exp(phi_z_intercept_49 + TSLAG(log(rer_4),1)*0.95) + res_phi_z_49
 
 COMMENT> 
 IDENTITY> rer_5
-EQ> rer_5 = pout_5*xr/pim_5
+EQ> rer_5 = pout_5/pim_5
 
 
 COMMENT> 
@@ -575,7 +580,7 @@ EQ> phi_z_59 = exp(phi_z_intercept_59 + TSLAG(log(rer_5),1)*2.5) + res_phi_z_59
 
 COMMENT> 
 IDENTITY> rer_6
-EQ> rer_6 = pout_6*xr/pim_6
+EQ> rer_6 = pout_6/pim_6
 
 
 
@@ -621,7 +626,7 @@ EQ> phi_z_69 = exp(phi_z_intercept_69 + TSLAG(log(rer_6),1)*1.2) + res_phi_z_69
 
 COMMENT> 
 IDENTITY> rer_7
-EQ> rer_7 = pout_7*xr/pim_7
+EQ> rer_7 = pout_7/pim_7
 
 COMMENT> 
 IDENTITY> phi_z_71
@@ -665,7 +670,7 @@ EQ> phi_z_79 = exp(phi_z_intercept_79 + TSLAG(log(rer_7),1)*2.5) + res_phi_z_79
 
 COMMENT> 
 IDENTITY> rer_8
-EQ> rer_8 = pout_8*xr/pim_8
+EQ> rer_8 = pout_8/pim_8
 
 COMMENT> 
 IDENTITY> phi_z_81
@@ -710,7 +715,7 @@ EQ> phi_z_89 = exp(phi_z_intercept_89 + TSLAG(log(rer_8),1)*0.95) + res_phi_z_89
 
 COMMENT> 
 IDENTITY> rer_9
-EQ> rer_9 = pout_9*xr/pim_9
+EQ> rer_9 = pout_9/pim_9
 
 COMMENT> 
 IDENTITY> phi_z_91
@@ -753,64 +758,82 @@ EQ> phi_z_99 = exp(phi_z_intercept_99 + TSLAG(log(rer_9),1)*2) + res_phi_z_99
 
 COMMENT> real exchange rate other consumption
 IDENTITY> rer_oth
-EQ> rer_oth = ppcon_oth*xr/pim_oth
+EQ> rer_oth = ppcon_oth/pim_oth
 
 COMMENT> real exchange rate Bread consumption
 IDENTITY> rer_110
-EQ> rer_110 = ppcon_110*xr/pim_110
+EQ> rer_110 = ppcon_110/pim_110
 
 COMMENT> real exchange rate Meat consumption
 IDENTITY> rer_120
-EQ> rer_120 = ppcon_120*xr/pim_120
+EQ> rer_120 = ppcon_120/pim_120
 
 COMMENT> real exchange rate Fish consumption
 IDENTITY> rer_130
-EQ> rer_130 = ppcon_130*xr/pim_130
+EQ> rer_130 = ppcon_130/pim_130
 
 COMMENT> real exchange rate Diary consumption
 IDENTITY> rer_140
-EQ> rer_140 = ppcon_140*xr/pim_140
+EQ> rer_140 = ppcon_140/pim_140
 
 COMMENT> real exchange rate Fruit and vegies consumption
 IDENTITY> rer_160
-EQ> rer_160 = ppcon_160*xr/pim_160
+EQ> rer_160 = ppcon_160/pim_160
 
 COMMENT> real exchange rate Other food consumption
 IDENTITY> rer_180
-EQ> rer_180 = ppcon_180*xr/pim_180
+EQ> rer_180 = ppcon_180/pim_180
 
 
 
+COMMENT> 
+BEHAVIORAL> phi_c_oth
+TSRANGE 1996 1 2019 1
+EQ> LOG(phi_c_oth) = phi_0 + phi_1*TSLAG(LOG(rer_oth),1)
+COEFF> phi_0 phi_1
+STORE> coe(1)
 
+COMMENT> 
+BEHAVIORAL> phi_c_110
+TSRANGE 1996 1 2019 1
+EQ> LOG(phi_c_110) = phi_0 + phi_1*TSLAG(LOG(rer_110),1)
+COEFF> phi_0 phi_1
+STORE> coe(1)
 
-COMMENT> real exchange rate other consumption
-IDENTITY> phi_c_oth
-EQ> phi_c_oth = exp(-2.21873 + 0.89434*TSLAG(log(rer_oth),1)) + res_phi_c_oth
+COMMENT> 
+BEHAVIORAL> phi_c_120
+TSRANGE 1996 1 2019 1
+EQ> LOG(phi_c_120) = phi_0 + phi_1*TSLAG(LOG(rer_120),1)
+COEFF> phi_0 phi_1
+STORE> coe(1)
 
-COMMENT> real exchange rate other consumption
-IDENTITY> phi_c_110
-EQ> phi_c_110 = exp(-1.65924 + 3.10819*TSLAG(log(rer_110),1)) + res_phi_c_110
+COMMENT> 
+BEHAVIORAL> phi_c_130
+TSRANGE 1996 1 2019 1
+EQ> LOG(phi_c_130) = phi_0 + phi_1*TSLAG(LOG(rer_130),1)
+COEFF> phi_0 phi_1
+STORE> coe(1)
 
-COMMENT> real exchange rate other consumption
-IDENTITY> phi_c_120
-EQ> phi_c_120 = exp(-1.2707 + 3.9446*TSLAG(log(rer_120),1)) + res_phi_c_120
+COMMENT> 
+BEHAVIORAL> phi_c_140
+TSRANGE 1996 1 2019 1
+EQ> LOG(phi_c_140) = phi_0 + phi_1*TSLAG(LOG(rer_140),1)
+COEFF> phi_0 phi_1
+STORE> coe(1)
 
-COMMENT> real exchange rate other consumption
-IDENTITY> phi_c_130
-EQ> phi_c_130 = exp(-1.59608 + 1.05849*TSLAG(log(rer_130),1)) + res_phi_c_130
+COMMENT> 
+BEHAVIORAL> phi_c_160
+TSRANGE 1996 1 2019 1
+EQ> LOG(phi_c_160) = phi_0 + phi_1*TSLAG(LOG(rer_160),1)
+COEFF> phi_0 phi_1
+STORE> coe(1)
 
-COMMENT> real exchange rate other consumption
-IDENTITY> phi_c_140
-EQ> phi_c_140 = exp(-2.08829 + 3.34021*TSLAG(log(rer_140),1)) + res_phi_c_140
-
-COMMENT> real exchange rate other consumption
-IDENTITY> phi_c_160
-EQ> phi_c_160 = exp(-0.95976 + 1.32051*TSLAG(log(rer_160),1)) + res_phi_c_160
-
-COMMENT> real exchange rate other consumption
-IDENTITY> phi_c_180
-EQ> phi_c_180 = exp(-1.27859 + 2.10716*TSLAG(log(rer_180),1)) + res_phi_c_180
-
+COMMENT> 
+BEHAVIORAL> phi_c_180
+TSRANGE 1996 1 2019 1
+EQ> LOG(phi_c_180) = phi_0 + phi_1*TSLAG(LOG(rer_180),1)
+COEFF> phi_0 phi_1
+STORE> coe(1)
 
 
 
@@ -5768,6 +5791,7 @@ IDENTITY> emp_tot
 EQ> emp_tot = emp_1 + emp_2 + emp_3 + emp_4 + emp_5 + emp_6 + emp_7 + emp_8 + emp_9
 
 
+
 COMMENT> Total Unemployed
 IDENTITY> unemp
 EQ> unemp = LF-emp_tot 
@@ -5777,6 +5801,89 @@ Comment> We can determine ourself when we would like to go back to aggregated le
 COMMENT> Total Unemployed
 IDENTITY> unemp_rate
 EQ> unemp_rate = unemp/LF
+
+
+
+
+COMMENT> 
+IDENTITY> avg_w_t
+EQ> avg_w_t = TSLAG(avg_w,1) * (1+TSLAG(TSDELTALOG(ppcon_tax),1))
+
+
+
+COMMENT> 
+BEHAVIORAL> avg_w
+TSRANGE 2000 1 2019 1
+EQ> TSDELTALOG(avg_w) = beta_0 + beta_1 * TSLAG(TSDELTALOG(avg_w),2) + beta_2 * TSLAG(TSDELTALOG(avg_w_t),2)  + beta_3 * TSLAG(LOG(avg_w),1) + beta_4 * TSLAG(LOG(avg_w_t),1) + beta_5 * TSLAG((avg_prodk),1)
+COEFF> beta_0 beta_1 beta_2 beta_3 beta_4 beta_5
+STORE> coe(1)
+
+
+
+
+COMMENT> 
+BEHAVIORAL> w_1
+TSRANGE 1996 1 2019 1
+EQ> LOG(w_1) =  beta_0 + beta_1 * LOG(avg_w)
+COEFF> beta_0 beta_1
+STORE> coe(1)
+
+COMMENT> 
+BEHAVIORAL> w_2
+TSRANGE 1996 1 2019 1
+EQ> LOG(w_2) =  beta_0 + beta_1 * LOG(avg_w)
+COEFF> beta_0 beta_1
+STORE> coe(1)
+
+COMMENT> 
+BEHAVIORAL> w_3
+TSRANGE 1996 1 2019 1
+EQ> LOG(w_3) =  beta_0 + beta_1 * LOG(avg_w)
+COEFF> beta_0 beta_1
+STORE> coe(1)
+
+COMMENT> 
+BEHAVIORAL> w_4
+TSRANGE 1996 1 2019 1
+EQ> LOG(w_4) =  beta_0 + beta_1 * LOG(avg_w)
+COEFF> beta_0 beta_1
+STORE> coe(1)
+
+COMMENT> 
+BEHAVIORAL> w_5
+TSRANGE 1996 1 2019 1
+EQ> LOG(w_5) =  beta_0 + beta_1 * LOG(avg_w)
+COEFF> beta_0 beta_1
+STORE> coe(1)
+
+COMMENT> 
+BEHAVIORAL> w_6
+TSRANGE 1996 1 2019 1
+EQ> LOG(w_6) =  beta_0 + beta_1 * LOG(avg_w)
+COEFF> beta_0 beta_1
+STORE> coe(1)
+
+COMMENT> 
+BEHAVIORAL> w_7
+TSRANGE 1996 1 2019 1
+EQ> LOG(w_7) =  beta_0 + beta_1 * LOG(avg_w)
+COEFF> beta_0 beta_1
+STORE> coe(1)
+
+COMMENT> 
+BEHAVIORAL> w_8
+TSRANGE 1996 1 2019 1
+EQ> LOG(w_8) =  beta_0 + beta_1 * LOG(avg_w)
+COEFF> beta_0 beta_1
+STORE> coe(1)
+
+COMMENT> 
+BEHAVIORAL> w_9
+TSRANGE 1996 1 2019 1
+EQ> LOG(w_9) =  beta_0 + beta_1 * LOG(avg_w)
+COEFF> beta_0 beta_1
+STORE> coe(1)
+
 
 
 COMMENT> Wages paid by non financial firms

@@ -105,6 +105,7 @@ S_modelData=c(Model_data_1995, Model_data_1996,Model_data_collected_IO,Trade_var
 ```
 
 
+
 ## Shock variables:
 
 ```{r}
@@ -170,6 +171,7 @@ We can update the current price indexes with the new ones calculated based on IO
 S_modelData$ppcon=S_modelData$ppcon_io
 S_modelData$pin=S_modelData$pin_io
 S_modelData$pinvent=S_modelData$pinvent_io
+S_modelData$pval=S_modelData$pval_io
 S_modelData$px=S_modelData$px_io
 S_modelData$pg=S_modelData$pg_io
 S_modelData$pim=S_modelData$pim_io
@@ -183,13 +185,15 @@ We need to calculate new deflated variables:
 S_modelData$pconk_io=S_modelData$pcon/S_modelData$ppcon
 S_modelData$ik_io=S_modelData$i/S_modelData$pin
 S_modelData$inventk_io=S_modelData$invent/S_modelData$pinvent
+S_modelData$valk_io=S_modelData$val/S_modelData$pval
 S_modelData$xk_io=S_modelData$x/S_modelData$px
 S_modelData$gk_io=S_modelData$g/S_modelData$pg
 S_modelData$imk_io=S_modelData$im /S_modelData$pim
 
 
-S_modelData$yk_io= S_modelData$pconk_io + S_modelData$ik_io + S_modelData$inventk_io + S_modelData$xk_io + S_modelData$gk_io - S_modelData$imk_io
-S_modelData$nxk  = S_modelData$xk - S_modelData$imk
+S_modelData$yk_io= S_modelData$pconk_io + S_modelData$ik_io + S_modelData$inventk_io + S_modelData$valk_io + S_modelData$xk_io + S_modelData$gk_io - S_modelData$imk_io
+
+
 ```
 
 
@@ -235,11 +239,33 @@ As the differences seem to not be to large, we update the real variables to use 
 S_modelData$pconk=S_modelData$pcon/S_modelData$ppcon
 S_modelData$ik=S_modelData$i/S_modelData$pin
 S_modelData$inventk=S_modelData$invent/S_modelData$pinvent
+S_modelData$valk=S_modelData$val/S_modelData$pval
 S_modelData$xk=S_modelData$x/S_modelData$px
 S_modelData$gk=S_modelData$g/S_modelData$pg
 S_modelData$imk=S_modelData$im /S_modelData$pim
 
-S_modelData$yk= S_modelData$pconk + S_modelData$ik + S_modelData$inventk + S_modelData$xk + S_modelData$gk - S_modelData$imk
+S_modelData$yk= S_modelData$pconk + S_modelData$ik + S_modelData$inventk + S_modelData$valk + S_modelData$xk + S_modelData$gk - S_modelData$imk
+
+S_modelData$nxk  = S_modelData$xk - S_modelData$imk
+```
+
+
+## Consumption tax
+
+```{r}
+S_modelData$c_oth_envT=TIMESERIES(rep(0,25), START = c(1995,1), FREQ = 1)
+S_modelData$c_110_envT=TIMESERIES(rep(0,25), START = c(1995,1), FREQ = 1)
+S_modelData$c_120_envT=TIMESERIES(rep(0,25), START = c(1995,1), FREQ = 1)
+S_modelData$c_130_envT=TIMESERIES(rep(0,25), START = c(1995,1), FREQ = 1)
+S_modelData$c_140_envT=TIMESERIES(rep(0,25), START = c(1995,1), FREQ = 1)
+S_modelData$c_160_envT=TIMESERIES(rep(0,25), START = c(1995,1), FREQ = 1)
+S_modelData$c_180_envT=TIMESERIES(rep(0,25), START = c(1995,1), FREQ = 1)
+
+
+
+S_modelData$c_envT= S_modelData$c_oth_envT + S_modelData$c_110_envT + S_modelData$c_120_envT + S_modelData$c_130_envT + S_modelData$c_140_envT + S_modelData$c_160_envT + S_modelData$c_180_envT
+
+S_modelData$envT_tot =  S_modelData$c_envT
 
 ```
 
@@ -251,10 +277,13 @@ S_modelData$yd_hk_tax=S_modelData$yd_h/S_modelData$ppcon_tax
 S_modelData$fnw_hk_tax = S_modelData$fnw_h/S_modelData$ppcon_tax
 ```
 
+```{r}
+S_modelData$avg_w_t = TSLAG(S_modelData$avg_w,1) * (1+TSLAG(TSDELTALOG(S_modelData$ppcon_tax),1))
+
+S_modelData$avg_prodk = S_modelData$yk / S_modelData$emp_tot
+```
 
 # Combine model with data!
-
-We combine the model text with the model data
 
 ```{r}
 S_model=LOAD_MODEL_DATA(S_model,S_modelData)
@@ -263,8 +292,6 @@ S_model=LOAD_MODEL_DATA(S_model,S_modelData)
 
 
 # Estimate
-
-We estimate the behavioural equations using the time range defined. Keep in mind that each behavioural equation has its own specific time range (see the model code).
 
 ```{r}
 
@@ -277,29 +304,26 @@ S_model=ESTIMATE(S_model
 
 # Baseline
 
-We simulate the baseline model
-
 
 ```{r, results='hide'}
 # Simulate the model (following shock)
 Exo_model <- SIMULATE(S_model
                     ,simType='dynamic'
-                    ,TSRANGE=c(1998,1,2019,1)
+                    ,TSRANGE=c(2000,1,2019,1)
                     ,simConvergence=0.00001
                     ,simIterLimit=100
                     )
 ```
 
 
-We check that the consistency checks are close to zero
-```{r}
 
+```{r}
 Exo_model$simulation$check_nl
+Exo_model$simulation$check_sec
 Exo_model$simulation$check_np
 Exo_model$simulation$check_ctr
 Exo_model$simulation$check_invest
 Exo_model$simulation$check_tax
-
 ```
 
 
@@ -455,7 +479,7 @@ Scenario_1 = TIMESERIES(Scenario_1_shock+1 ,START=c(2010,1),  FREQ=1)
 # Simulate the model (following shock)
 Exo_model_S1 <- SIMULATE(S_model
                     ,simType='dynamic'
-                    ,TSRANGE=c(1998,1,2019,1)
+                    ,TSRANGE=c(2000,1,2019,1)
                     ,simConvergence=0.00001
                     ,simIterLimit=100
                     ,ConstantAdjustment=constantAdjList_s1
@@ -680,7 +704,7 @@ Scenario_2 = TIMESERIES(Scenario_2_shock+1 ,START=c(2010,1),  FREQ=1)
 # Simulate the model (following shock)
 Exo_model_S2 <- SIMULATE(S_model
                     ,simType='dynamic'
-                    ,TSRANGE=c(1998,1,2019,1)
+                    ,TSRANGE=c(2000,1,2019,1)
                     ,simConvergence=0.00001
                     ,simIterLimit=100
                     ,ConstantAdjustment=constantAdjList_s2
@@ -870,7 +894,7 @@ Scenario_3 = TIMESERIES(Scenario_3_shock+1 ,START=c(2010,1),  FREQ=1)
 # Simulate the model (following shock)
 Exo_model_S3 <- SIMULATE(S_model
                     ,simType='dynamic'
-                    ,TSRANGE=c(1998,1,2019,1)
+                    ,TSRANGE=c(2000,1,2019,1)
                     ,simConvergence=0.00001
                     ,simIterLimit=100
                     ,ConstantAdjustment=constantAdjList_s3
@@ -1343,4 +1367,3 @@ plot((Exo_model_S3$simulation$fnw_rowk - Exo_model$simulation$fnw_rowk), col= "r
 # Adding a collective title for both plots
 mtext("Effect on real financial net wealth", side = 3, outer = TRUE, line = 1, cex = 1.5)
 ```
-
